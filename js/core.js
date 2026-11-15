@@ -172,8 +172,14 @@
   /* ---------- flashcards (Leitner) ---------- */
   const IV = [0, 1, 2, 4, 8, 16, 35];
   FR.VERB_DECK = { id: 'verbs', name: 'Verb bank (infinitives + participles)', day: 0, cards: VERBS.map((v, i) => ({ id: 'verbs-' + i, fr: v.i, en: v.e + ' · p.p. ' + CONJ.participle(v) + ' (' + CONJ.aux(v) + ')' })) };
-  FR.deck = (id) => (id === 'verbs' ? FR.VERB_DECK : DECKS[id]);
-  FR.allDecks = () => Object.values(DECKS).concat([FR.VERB_DECK]);
+  /* ---------- speaking topics ---------- */
+  const lines = (t) => String(t || '').trim().split('\n').map((l) => l.split('|').map((x) => x.trim())).filter((r) => r[0]);
+  FR.SPEAK = (window.SPEAK || []).sort((a, b) => a.day - b.day).map((t) => Object.assign({}, t, { V: lines(t.v), X: lines(t.x), P: lines(t.p), E: lines(t.e), Q: lines(t.q), O: lines(t.o) }));
+  FR.speak = (d) => FR.SPEAK.find((t) => t.day === +d);
+  FR.SPEAK_DECKS = {};
+  FR.SPEAK.forEach((t) => { FR.SPEAK_DECKS['sp' + t.day] = { id: 'sp' + t.day, name: 'Speaking ' + t.day + ': ' + t.title, day: t.day, speak: true, cards: t.V.concat(t.X).map((r, i) => ({ id: 'sp' + t.day + '-' + i, fr: r[0], en: r[1] || '' })) }; });
+  FR.deck = (id) => (id === 'verbs' ? FR.VERB_DECK : DECKS[id] || FR.SPEAK_DECKS[id]);
+  FR.allDecks = () => Object.values(DECKS).concat(Object.values(FR.SPEAK_DECKS), [FR.VERB_DECK]);
   FR.cardDue = (c) => { const r = S.srs[c.id]; return !r || r.due <= Date.now(); };
   FR.deckStats = (d) => { let n = 0, due = 0, learned = 0; d.cards.forEach((c) => { const r = S.srs[c.id]; if (!r) n++; else { if (r.due <= Date.now()) due++; if (r.b >= 3) learned++; } }); return { new: n, due, learned, total: d.cards.length }; };
   FR.rate = (c, g) => { // g: 0 again, 1 hard, 2 good, 3 easy

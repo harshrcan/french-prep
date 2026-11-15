@@ -7,7 +7,7 @@
 
   /* ---------- shell ---------- */
   const NAV = [['#/', 'Today', 'home'], ['#/lessons', 'Lessons', 'book'], ['#/practice', 'Practice', 'target'], ['#/cards', 'Cards', 'cards'], ['#/me', 'Me', 'user']];
-  const NAV_EXTRA = [['#/stories', 'Stories', 'read'], ['#/verbs', 'Verbs', 'verb'], ['#/write', 'Writing', 'pen'], ['#/maps', 'Concept maps', 'map']];
+  const NAV_EXTRA = [['#/speak', 'Speaking topics', 'mic'], ['#/stories', 'Stories', 'read'], ['#/verbs', 'Verbs', 'verb'], ['#/write', 'Writing', 'pen'], ['#/maps', 'Concept maps', 'map']];
   function shell(active) {
     $('#tabs').innerHTML = NAV.map(([h, t, i]) => `<a href="${h}" class="${active === h ? 'on' : ''}">${ICON[i]}<span>${t}</span></a>`).join('');
     $('#nav').innerHTML = NAV.map(([h, t, i]) => `<a href="${h}" class="${active === h ? 'on' : ''}">${ICON[i]}${t}</a>`).join('') + '<div class="sep"></div>' + NAV_EXTRA.map(([h, t, i]) => `<a href="${h}" class="${active === h ? 'on' : ''}">${ICON[i]}${t}</a>`).join('');
@@ -59,7 +59,7 @@
       vocab: [`Deck: ${FR.deck(L.deck).name} · verbs: ${L.verbs.slice(0, 4).join(', ')}…`, a(`#/cards/${L.deck}`, 'Flashcards', 1) + a(`#/drill?day=${d}`, 'Verb drill') + a('#/cards/all', 'All due cards')],
       reading: [`Story: ${FR.story(sid).title}`, a(`#/story/${sid}`, 'Read', 1) + a(`#/story/${sid}/quiz`, 'Questions') + a(`#/seq/${sid}`, 'Order the story')],
       listening: ['Listen without the text first, then dictation.', a(`#/story/${sid}/listen`, 'Listen', 1) + a(`#/dict?day=${d}`, 'Dictation')],
-      speaking: ['Shadow at least 6 lines with recording or the speech check.', a(`#/shadow/${sid}`, 'Shadow story', 1) + a(`#/shadow/lesson/${d}`, 'Shadow examples')],
+      speaking: [`Topic: ${FR.speak(d) ? FR.speak(d).title : ''}. Answer 4+ questions aloud, or shadow 6+ lines.`, a(`#/lesson/${d}/speak`, 'Speaking topic', 1) + a(`#/cards/sp${d}`, 'Topic words') + a(`#/shadow/${sid}`, 'Shadow story')],
       writing: [`Task: ${w.title}`, a(`#/write/${w.id}`, 'Write', 1) + a('#/quiz?mode=mistakes', `Mistakes (${S().mist.filter((id) => FR.EX[id]).length})`)]
     }[k];
   }
@@ -104,7 +104,7 @@
     setTop('Day ' + L.day + ' · ' + L.theme, '#/lessons');
     const rec = FR.lesRec(L.day);
     if (tab === 'retest') return startLessonSet(L, 'retest');
-    const tabs = [['learn', 'Learn'], ['map', 'Concept map'], ['practice', 'Practice'], ['verbs', 'Verbs'], ['words', 'Words'], ['story', 'Story']];
+    const tabs = [['learn', 'Learn'], ['map', 'Concept map'], ['practice', 'Practice'], ['speak', 'Speak'], ['verbs', 'Verbs'], ['words', 'Words'], ['story', 'Story']];
     let body = '';
     if (tab === 'learn') {
       if (!rec.seen) { rec.seen = Date.now(); FR.save(); }
@@ -138,6 +138,8 @@
       const dk = FR.deck(L.deck);
       body = `<div class="row" style="margin-bottom:12px"><a class="btn pri" href="#/cards/${dk.id}">${ICON.cards} Study this deck</a><a class="btn" href="#/cards/${dk.id}?cram=1">Cram all</a></div>
         <div class="card">${dk.cards.map((c) => `<div class="list-row"><div class="grow"><span class="fr">${esc(c.fr)}</span><div class="dim" style="font-size:13.5px">${esc(c.en)}</div></div>${FR.sayBtn(c.fr)}</div>`).join('')}</div>`;
+    } else if (tab === 'speak') {
+      body = speakBody(FR.speak(L.day));
     } else if (tab === 'story') {
       body = L.stories.map((sid) => { const s = FR.story(sid); return `<a class="tile" href="#/story/${sid}"><div class="k">${s.lvl} · ${esc(s.focus)}</div><div class="t">${esc(s.title)}</div><div class="s">Read, listen, shadow, dictation, questions</div></a>`; }).join('');
     }
@@ -145,6 +147,7 @@
       <div class="lesson-tabs">${tabs.map(([k, t]) => `<button class="${k === tab ? 'on' : ''}" data-t="${k}">${t}</button>`).join('')}</div><div id="lbody">${body}</div>`;
     $$('.lesson-tabs button', main).forEach((b) => (b.onclick = () => { location.hash = '#/lesson/' + L.day + (b.dataset.t === 'learn' ? '' : '/' + b.dataset.t); }));
     if (tab === 'map') bindMap(main);
+    if (tab === 'speak') bindSpeak(FR.speak(L.day));
     $$('[data-set]', main).forEach((b) => (b.onclick = () => startLessonSet(L, b.dataset.set)));
   }
   function startLessonSet(L, kind) {
@@ -155,6 +158,57 @@
     FR.runSet({ el: main, items: shuffle(items), mode: 'lesson', title: `Day ${L.day} · ${kind === 'retest' ? 'retest' : kind}`,
       onResult: (r) => { if (r.quit && r.n < 5) return; if (kind === 'full' || kind === 'quick' || kind === 'retest') FR.lessonResult(L.day, r.pct); if (r.n >= 8) FR.markBlock('grammar'); },
       onQuit: () => { location.hash = '#/lesson/' + L.day + '/practice'; } });
+  }
+  /* ---------- speaking topic ---------- */
+  const rows = (arr, cls) => arr.map(([f, e]) => `<div class="list-row"><div class="grow"><span class="fr">${esc(f)}</span>${e ? `<div class="dim" style="font-size:13.5px">${esc(e)}</div>` : ''}</div>${FR.sayBtn(f.replace(/\(.*?\)/g, ''))}</div>`).join('');
+  function speakBody(t) {
+    if (!t) return '<div class="empty">No speaking topic for this day.</div>';
+    const st = S(), rec = (st.sp || {})[t.day] || {};
+    return `<div class="card"><div class="eyebrow">Speaking topic · ${esc(t.lvl)}</div><h2 style="margin:4px 0 6px">${esc(t.title)}</h2><p class="dim" style="margin:0">Grammar to use: <b style="color:var(--tx)">${esc(t.focus)}</b></p>
+        <div class="row" style="margin-top:12px"><a class="btn pri sm" href="#/cards/sp${t.day}">${ICON.cards} Study the ${t.V.length + t.X.length} words</a><button class="btn sm" data-a="shs">${ICON.mic} Shadow the sample</button><button class="btn sm" data-a="shb">${ICON.mic} Shadow the B1 answer</button></div>
+        ${rec.q ? `<p class="dim" style="margin:10px 0 0;font-size:13px">${rec.q} answers recorded so far.</p>` : ''}</div>
+      <details class="card tight" open><summary><b>1. Vocabulary</b> <span class="dim">(${t.V.length} words)</span></summary>${rows(t.V)}</details>
+      <details class="card tight"><summary><b>2. Verbs and expressions</b> <span class="dim">(${t.X.length})</span></summary>${rows(t.X)}</details>
+      <details class="card tight"><summary><b>3. What native speakers say</b></summary>${rows(t.P)}</details>
+      <details class="card tight"><summary><b>4. Examples with today's grammar</b></summary>${rows(t.E)}</details>
+      <div class="card tight"><h4 style="margin:4px 0 6px">5. Speaking questions</h4><p class="dim" style="margin:0 0 6px;font-size:13.5px">Easy to hard. Listen, answer aloud for 30 to 90 seconds, then play yourself back. Use the words above and the grammar of the day.</p>
+        ${t.Q.map(([f, e], i) => `<div class="list-row" style="align-items:flex-start"><span class="tag" style="margin-top:3px">${i + 1}</span><div class="grow"><span class="fr">${esc(f)}</span><div class="dim" style="font-size:13px">${esc(e || '')}</div><div class="row" style="gap:6px;margin-top:6px"><button class="btn sm" data-rec="${i}">${ICON.mic} Answer</button><button class="btn sm ghost" data-play="${i}" disabled>${ICON.play} Mine</button></div></div>${FR.sayBtn(f)}</div>`).join('')}</div>
+      <details class="card tight"><summary><b>6. Build and defend your opinion</b></summary>${rows(t.O)}</details>
+      <div class="card"><div class="row between"><h4 style="margin:0">7. Sample answers</h4><div class="seg" style="margin:0"><button data-lv="s" class="on">My level (${esc(t.lvl)})</button><button data-lv="b">B1 push</button></div></div>
+        <div class="story-text" id="spx" style="margin-top:12px;font-size:1.06rem">${esc(t.s)}</div>
+        <div class="row" style="margin-top:12px"><button class="btn sm" data-a="pl">${ICON.play} Listen</button><button class="btn sm ghost" data-a="st">${ICON.stop}</button></div>
+        <p class="dim" style="font-size:13px;margin-bottom:0">Read the B1 version for the connectors and longer sentences, then try answering question ${t.Q.length} again using two of them.</p></div>`;
+  }
+  const splitS = (txt) => txt.split(/(?<=[.!?])\s+/).filter((x) => x.trim().length > 2);
+  function bindSpeak(t) {
+    if (!t) return;
+    let lv = 's';
+    $$('[data-lv]', main).forEach((b) => (b.onclick = () => { lv = b.dataset.lv; FR.stopLines(); $$('[data-lv]', main).forEach((x) => x.classList.toggle('on', x === b)); $('#spx').textContent = t[lv]; }));
+    main.querySelector('[data-a=pl]').onclick = () => FR.playLines(splitS(t[lv]));
+    main.querySelector('[data-a=st]').onclick = () => FR.stopLines();
+    const shadow = (k) => { setTop('Shadow · ' + t.title, '#/lesson/' + t.day + '/speak'); FR.runShadow({ el: main, lines: splitS(t[k]).map((x) => [x, '']), title: t.title + (k === 'b' ? ' · B1' : ''), back: '#/lesson/' + t.day + '/speak' }); };
+    main.querySelector('[data-a=shs]').onclick = () => shadow('s');
+    main.querySelector('[data-a=shb]').onclick = () => shadow('b');
+    const urls = {}; let stream = null, rec = null, curBtn = null;
+    FR.cleanups.push(() => { try { rec && rec.state !== 'inactive' && rec.stop(); } catch (e) { /* */ } if (stream) stream.getTracks().forEach((x) => x.stop()); Object.values(urls).forEach((u) => URL.revokeObjectURL(u)); });
+    $$('[data-rec]', main).forEach((b) => (b.onclick = async () => {
+      const i = b.dataset.rec;
+      if (rec && rec.state === 'recording') { const same = curBtn === b; rec.stop(); if (same) return; }
+      if (!navigator.mediaDevices || !window.MediaRecorder) return FR.toast('Recording is not supported in this browser.', 'bad');
+      try { stream = stream || await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (e) { return FR.toast('Microphone permission was denied.', 'bad'); }
+      const chunks = []; rec = new MediaRecorder(stream); curBtn = b;
+      rec.ondataavailable = (e) => chunks.push(e.data);
+      rec.onstop = () => { if (urls[i]) URL.revokeObjectURL(urls[i]); urls[i] = URL.createObjectURL(new Blob(chunks, { type: rec.mimeType })); b.innerHTML = ICON.mic + ' Again'; main.querySelector(`[data-play="${i}"]`).disabled = false;
+        const st = S(); st.sp = st.sp || {}; const r = (st.sp[t.day] = st.sp[t.day] || { q: 0 }); r.q++; const dr = FR.dayRec(FR.curDay()); dr.spokeN = (dr.spokeN || 0) + 1; if (dr.spokeN >= 4) FR.markBlock('speaking'); FR.save(); };
+      rec.start(); b.innerHTML = '<span class="rec-dot"></span> Stop';
+      setTimeout(() => { if (rec && rec.state === 'recording' && curBtn === b) rec.stop(); }, 120000);
+    }));
+    $$('[data-play]', main).forEach((b) => (b.onclick = () => { const u = urls[b.dataset.play]; if (u) new Audio(u).play(); }));
+  }
+  function pageSpeakList() {
+    setTop('Speaking topics', '#/practice'); const d = FR.curDay();
+    main.innerHTML = `<div class="hero"><h1>Speaking topics</h1><p class="dim">One topic per day, matched to that day's grammar. Each has vocabulary, native phrases, graded questions, opinion builders and two sample answers (your level and B1).</p></div>
+      <div class="grid g2">${FR.SPEAK.map((t) => { const r = (S().sp || {})[t.day]; return `<a class="tile ${t.day === d ? 'today' : ''}" href="#/lesson/${t.day}/speak"><div class="row between"><span class="k">Day ${t.day} · ${esc(t.lvl)}</span>${r && r.q ? `<span class="pill ok">${r.q} answers</span>` : ''}</div><div class="t">${esc(t.title)}</div><div class="s">${esc(t.focus)}</div></a>`; }).join('')}</div>`;
   }
   function conjCard(v, t) { return `<div class="card"><h4>${CONJ.TENSES[t]}</h4>${[0, 1, 2, 3, 4, 5].map((k) => { const l = CONJ.line(v, t, k); return l ? `<div class="l" style="cursor:pointer">${esc(l)}</div>` : ''; }).join('')}</div>`; }
 
@@ -181,6 +235,8 @@
         ${t('#/stories', STORIES.length + ' stories', 'Reading library', 'A1 to B1 stories with glossary, translation and questions.')}
         ${t(`#/story/${FR.lesson(d).stories[0]}/listen`, 'audio only', 'Listening', 'Hear the story without text, answer, then check the transcript.')}
         ${t(`#/dict?day=${d}`, '8 sentences', 'Dictation', 'Write exactly what you hear. Word-by-word correction.')}
+        ${t(`#/lesson/${d}/speak`, 'day ' + d, 'Today\'s speaking topic', FR.speak(d) ? FR.speak(d).title : '')}
+        ${t('#/speak', '20 topics', 'All speaking topics', 'Vocabulary, questions, opinions and sample answers for every day.')}
         ${t(`#/shadow/${FR.lesson(d).stories[0]}`, 'speaking', 'Shadowing', 'Repeat with the audio, record yourself, check pronunciation.')}
         ${t(`#/seq/${FR.lesson(d).stories[0]}`, 'stories', 'Story ordering', 'Put the sentences of a story back in order.')}
       </div>
@@ -538,6 +594,7 @@
     [/^\/cards\/(\w+)$/, '#/cards', (m, q) => pageDeck(m[1], q)],
     [/^\/mock\/(\w+)$/, '#/practice', (m) => pageMock(m[1])],
     [/^\/maps$/, '#/maps', () => pageMaps()],
+    [/^\/speak$/, '#/practice', () => pageSpeakList()],
     [/^\/me$/, '#/me', () => pageMe()]
   ];
   function route() {
