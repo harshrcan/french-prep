@@ -52,7 +52,7 @@
 
   function rankCard() {
     const p = S().pts || 0, r = FR.rank(p), pct = r.next ? Math.round(((p - r.min) / (r.next[0] - r.min)) * 100) : 100;
-    return `<div class="card rank-card"><div class="row between"><div><div class="eyebrow">Your rank</div><div class="rank">${esc(r.name)}</div><div class="dim" style="font-size:13px">${esc(r.desc)}</div></div><div style="text-align:right"><div class="eyebrow">Points</div><div class="rank" style="color:var(--gold)">✦ ${p}</div></div></div>
+    return `<div class="card rank-card" style="position:relative;padding-right:${matchMedia('(min-width:500px)').matches ? 110 : 18}px"><div class="char-corner" style="top:auto;bottom:6px;width:84px;${matchMedia('(min-width:500px)').matches ? '' : 'display:none'}">${FR.CHAR.student}</div><div class="row between"><div><div class="eyebrow">Your rank</div><div class="rank">${esc(r.name)}</div><div class="dim" style="font-size:13px">${esc(r.desc)}</div></div><div style="text-align:right"><div class="eyebrow">Points</div><div class="rank" style="color:var(--gold)">✦ ${p}</div></div></div>
       <div class="progress" style="margin-top:12px"><i style="width:${pct}%"></i></div><div class="dim" style="font-size:12px;margin-top:6px">${r.next ? (r.next[0] - p) + ' points to ' + esc(r.next[1]) : 'Highest rank reached'} · correct answer +2 · block +15 · full day +50 · mastery +25/40</div></div>`;
   }
 
@@ -83,6 +83,7 @@
     const grid = LESSONS.map((l) => { const m = FR.mastery(l.day); const r = st.days[l.day]; const comp = r ? FR.BLOCKS.filter((b) => r.blocks[b.k]).length : 0; const cls = m >= 3 && comp >= 5 ? 'd3' : comp >= 3 || m >= 3 ? 'd2' : comp || m ? 'd1' : ''; return `<a href="#/lesson/${l.day}" class="${cls} ${l.day === d && raw >= 1 && raw <= 20 ? 'cur' : ''}" title="Day ${l.day}: ${esc(l.title)}">${l.day}</a>`; }).join('');
     const ex = Object.values(st.ex); const c = ex.reduce((a, r) => a + r.c, 0), w = ex.reduce((a, r) => a + r.w, 0);
     main.innerHTML = `<div class="hero">${hero}</div>
+      ${FR.charCard('prof', esc(FR.profTip(d)) + (doneN === 6 ? ' <b>Journée parfaite !</b>' : ''))}
       ${L.assess && raw >= 1 ? `<a class="tile today" href="#/mock/${L.assess}" style="margin-bottom:14px"><div class="k">Assessment day</div><div class="t">${esc(MOCKS[L.assess].title)}</div><div class="s">${esc(MOCKS[L.assess].desc)}${st.mocks[L.assess] ? ' · best ' + st.mocks[L.assess].best + '%' : ''}</div></a>` : ''}
       <div class="card"><div class="row between"><h3 style="margin:0">Today's 3 hours</h3><span class="pill ${doneN === 6 ? 'ok' : ''}">${doneN}/6 blocks</span></div>
         <div style="margin:12px 0 4px" class="row between"><span class="dim" style="font-size:13px">Active time today: <b style="color:var(--tx)">${FR.fmtMin(sec)}</b> of 3h</span><span class="dim" style="font-size:13px">${Math.min(100, Math.round(sec / 108))}%</span></div>
@@ -115,7 +116,7 @@
     let body = '';
     if (tab === 'learn') {
       if (!rec.seen) { rec.seen = Date.now(); FR.save(); }
-      body = `<div class="card"><h4>By the end you can</h4><ul style="margin:0;padding-left:1.2em">${L.goals.map((g) => `<li>${esc(g)}</li>`).join('')}</ul></div>
+      body = `${FR.charCard('prof', 'Bienvenue au cours du jour ' + L.day + ' ! Lis, écoute chaque exemple, puis passe à la pratique.')}<div class="card"><h4>By the end you can</h4><ul style="margin:0;padding-left:1.2em">${L.goals.map((g) => `<li>${esc(g)}</li>`).join('')}</ul></div>
         <div class="concept">${renderConcept(L.concept)}</div>
         <hr><div class="row"><a class="btn pri" href="#/lesson/${L.day}/practice">Practice now ${ICON.next}</a><a class="btn" href="#/lesson/${L.day}/map">Concept map</a><a class="btn ghost" href="#/shadow/lesson/${L.day}">Shadow the examples</a></div>`;
     } else if (tab === 'map') {
@@ -214,7 +215,7 @@
   }
   function pageSpeakList() {
     setTop('Speaking topics', '#/practice'); const d = FR.curDay();
-    main.innerHTML = `<div class="hero"><h1>Speaking topics</h1><p class="dim">One topic per day, matched to that day's grammar. Each has vocabulary, native phrases, graded questions, opinion builders and two sample answers (your level and B1).</p></div>
+    main.innerHTML = `<div class="hero"><div class="char-corner">${FR.CHAR.student}</div><h1>Speaking topics</h1><p class="dim">One topic per day, matched to that day's grammar. Each has vocabulary, native phrases, graded questions, opinion builders and two sample answers (your level and B1).</p></div>
       <div class="grid g2">${FR.SPEAK.map((t) => { const r = (S().sp || {})[t.day]; return `<a class="tile ${t.day === d ? 'today' : ''}" href="#/lesson/${t.day}/speak"><div class="row between"><span class="k">Day ${t.day} · ${esc(t.lvl)}</span>${r && r.q ? `<span class="pill ok">${r.q} answers</span>` : ''}</div><div class="t">${esc(t.title)}</div><div class="s">${esc(t.focus)}</div></a>`; }).join('')}</div>`;
   }
   function conjCard(v, t) { return `<div class="card"><h4>${CONJ.TENSES[t]}</h4>${[0, 1, 2, 3, 4, 5].map((k) => { const l = CONJ.line(v, t, k); return l ? `<div class="l" style="cursor:pointer">${esc(l)}</div>` : ''; }).join('')}</div>`; }
@@ -224,7 +225,7 @@
     setTop('Practice'); const st = S(), d = FR.curDay(), scope = st.scope || 'today';
     const mist = st.mist.filter((id) => FR.EX[id]).length;
     const t = (h, k, title, s) => `<a class="tile" href="${h}"><div class="k">${k}</div><div class="t">${title}</div><div class="s">${s}</div></a>`;
-    main.innerHTML = `<div class="hero"><h1>Practice</h1><p class="dim">Everything shows the answer and the rule after you try.</p></div>
+    main.innerHTML = `<div class="hero"><div class="char-corner">${FR.CHAR.cat}</div><h1>Practice</h1><p class="dim">Everything shows the answer and the rule after you try.</p></div>
       <div class="row" style="margin-bottom:14px"><span class="dim" style="font-size:13px">Quiz scope:</span><div class="seg" style="margin:0;flex:0 0 auto"><button data-sc="today" class="${scope === 'today' ? 'on' : ''}">Days 1–${d}</button><button data-sc="all" class="${scope === 'all' ? 'on' : ''}">All 20 days</button></div></div>
       <h3>Quizzes</h3><div class="grid g2">
         ${t('#/quiz?mode=mixed', '20 questions', 'Mixed quiz', 'All exercise types, weighted toward what you get wrong.')}
@@ -261,7 +262,7 @@
     const mode = q.mode || 'mixed', upto = scopeDay();
     const pool = Object.values(FR.EX).filter((e) => e.src.lesson && e.src.lesson <= upto);
     let items, title;
-    if (mode === 'mistakes') { items = S().mist.map((id) => FR.EX[id]).filter(Boolean).slice(0, 25).map((e) => Object.assign({}, e, { _review: true })); title = 'Mistakes review'; if (!items.length) { setTop('Mistakes', '#/practice'); main.innerHTML = '<div class="empty"><h3>No saved mistakes</h3><p>Every wrong answer lands here until you get it right.</p><a class="btn" href="#/practice">Back to practice</a></div>'; return; } }
+    if (mode === 'mistakes') { items = S().mist.map((id) => FR.EX[id]).filter(Boolean).slice(0, 25).map((e) => Object.assign({}, e, { _review: true })); title = 'Mistakes review'; if (!items.length) { setTop('Mistakes', '#/practice'); main.innerHTML = `<div style="max-width:520px;margin:20px auto">${FR.charCard('ghost', 'Pas une seule erreur à hanter ! Chaque mauvaise réponse viendra ici jusqu\'à ce que tu la corriges.', { cls: 'big' })}<a class="btn" href="#/practice">Back to practice</a></div>`; return; } }
     else if (mode === 'mixed') { items = FR.pickWeighted(pool, 20); title = 'Mixed quiz'; }
     else { const n = { mcq: 15, fill: 15, order: 12, write: 10 }[mode] || 15; items = FR.pickWeighted(pool.filter((e) => e.t === mode), n); title = { mcq: 'MCQ sprint', fill: 'Fill-ups', order: 'Sentence formation', write: 'Translation' }[mode]; }
     setTop(title, '#/practice');
@@ -323,7 +324,7 @@
   /* ======================= STORIES ======================= */
   function pageStories() {
     setTop('Stories', '#/practice');
-    main.innerHTML = `<div class="hero"><h1>Reading library</h1><p class="dim">Graded from A1 to B1. Each story has audio, line-by-line translation, a glossary, questions, a listening mode, shadowing and dictation.</p></div>
+    main.innerHTML = `<div class="hero"><div class="char-corner">${FR.CHAR.ghost}</div><h1>Reading library</h1><p class="dim">Graded from A1 to B1. Each story has audio, line-by-line translation, a glossary, questions, a listening mode, shadowing and dictation.</p></div>
       <div class="grid g2">${STORIES.map((s) => { const r = S().st[s.id] || {}; return `<a class="tile ${r.quiz >= 80 ? 'done' : ''}" href="#/story/${s.id}"><div class="row between"><span class="k">Day ${s.day} · ${s.lvl}</span>${r.quiz != null ? `<span class="pill ${r.quiz >= 80 ? 'ok' : ''}">${r.quiz}%</span>` : ''}</div><div class="t">${esc(s.title)}</div><div class="s">${esc(s.focus)}</div></a>`; }).join('')}</div>`;
   }
   function pageStory(id, mode) {
@@ -448,7 +449,7 @@
   function pageCards() {
     setTop('Flashcards'); const d = FR.curDay(), decks = FR.allDecks();
     const totDue = decks.reduce((a, k) => a + FR.deckStats(k).due, 0);
-    main.innerHTML = `<div class="hero"><h1>Flashcards</h1><p class="dim">Spaced repetition: cards you know come back less often. Rate honestly. 15 new cards per session.</p></div>
+    main.innerHTML = `<div class="hero"><div class="char-corner">${FR.CHAR.cat}</div><h1>Flashcards</h1><p class="dim">Spaced repetition: cards you know come back less often. Rate honestly. 15 new cards per session.</p></div>
       <div class="row" style="margin-bottom:14px"><a class="btn pri" href="#/cards/all">${ICON.cards} Review all due (${totDue})</a><a class="btn" href="#/cards/d${d}">Today's deck</a></div>
       <div class="card">${decks.map((k) => { const s = FR.deckStats(k); return `<div class="list-row"><div class="grow"><div class="row" style="gap:8px">${k.day ? `<span class="tag">day ${k.day}</span>` : '<span class="tag">verbs</span>'}<b style="font-weight:500">${esc(k.name)}</b></div><div class="dim" style="font-size:12.5px;margin-top:3px">${s.learned}/${s.total} learned · ${s.new} new${s.due ? ` · <span style="color:var(--gold)">${s.due} due</span>` : ''}</div><div class="progress ok" style="margin-top:6px;max-width:260px"><i style="width:${Math.round((s.learned / s.total) * 100)}%"></i></div></div><a class="btn sm ${k.day === d ? 'pri' : ''}" href="#/cards/${k.id}">Study</a></div>`; }).join('')}</div>`;
   }
@@ -569,7 +570,7 @@
   function pageWelcome() {
     setTop('Français A2 → B1');
     $('#tabs').style.display = 'none';
-    main.innerHTML = `<div class="welcome"><div class="big">L'Académie<br><em>de français</em></div>
+    main.innerHTML = `<div class="welcome"><div class="row" style="gap:6px;align-items:flex-end;margin-bottom:6px"><div style="width:84px">${FR.CHAR.student}</div><div style="width:70px">${FR.CHAR.cat}</div><div style="width:84px;margin-left:auto">${FR.CHAR.prof}</div></div><div class="big">L'Académie<br><em>de français</em></div>
       <p class="dim">A 20-day, 3-hours-a-day plan from A1 basics to a strong A2, with the bridge into B1. Grammar with audio, concept maps, quizzes, flashcards, stories, listening, shadowing, dictation and writing.</p>
       <div class="card">${authForm(true)}</div>
       <button class="btn ghost block" id="skip">Continue without an account</button>
