@@ -1,4 +1,6 @@
 /* Flashcard decks. One card per line: French | English. Nouns carry their article (gender). */
+// Stable ids: a card's id comes from its French text, so adding or reordering cards never shifts progress.
+window.__fh = function (str) { let h = 5381; str = String(str); for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) >>> 0; return h.toString(36); };
 window.DECKS = (function () {
   const raw = {
     d1: ['Introductions', `
@@ -525,7 +527,7 @@ faire une erreur | to make a mistake`]
   const out = {};
   Object.keys(raw).forEach((k) => {
     const [name, body] = raw[k];
-    out[k] = { id: k, name, day: +k.slice(1), cards: body.trim().split('\n').map((l, i) => { const [fr, en] = l.split('|').map((s) => s.trim()); return { id: k + '-' + i, fr, en }; }) };
+    out[k] = { id: k, name, day: +k.slice(1), cards: body.trim().split('\n').map((l, i) => { const [fr, en] = l.split('|').map((s) => s.trim()); return { id: k + '-' + window.__fh(fr), old: k + '-' + i, fr, en }; }) };
   });
   return out;
 })();

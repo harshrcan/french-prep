@@ -15,12 +15,12 @@
   }
   function topRight() {
     const c = FR.cloud.get(), cs = FR.cloud.status(), sec = S().log[FR.todayKey()] || 0;
-    $('#top-right').innerHTML = `<span class="pill ${sec >= 10800 ? 'ok' : 'gold'}" title="Active study time today">${FR.fmtMin(sec)} / 3h</span><a href="#/me" class="icon-btn" title="${c ? 'Cloud save: ' + esc(c.name) : 'Not signed in'}"><span class="sync-dot ${c ? (cs.err ? 'err' : 'on') : ''}"></span></a>`;
+    $('#top-right').innerHTML = `<span class="pill gold" id="pts" title="Points · rank: ${esc(FR.rank(S().pts || 0).name)}">✦ ${S().pts || 0}</span><span class="pill ${sec >= 10800 ? 'ok' : 'gold'}" title="Active study time today">${FR.fmtMin(sec)}<span class="hide-sm"> / 3h</span></span><a href="#/me" class="icon-btn" title="${c ? 'Cloud save: ' + esc(c.name) : 'Not signed in'}"><span class="sync-dot ${c ? (cs.err ? 'err' : 'on') : ''}"></span></a>`;
     $('#side-foot').innerHTML = c ? `Signed in as <b>${esc(c.name)}</b><br>${cs.err ? '<span style="color:var(--bad)">sync issue</span>' : 'progress syncs to the cloud'}` : 'Progress saved on this device.<br><a href="#/me">Sign in to sync →</a>';
   }
   FR.onSync = topRight;
   setInterval(() => { if (!document.hidden) topRight(); }, 30000);
-  function setTop(title, back) { $('#top-title').textContent = title; const b = $('#back'); b.hidden = !back; b.onclick = () => { if (typeof back === 'string') location.hash = back; else history.back(); }; document.title = title + ' · Français A2 → B1'; }
+  function setTop(title, back) { $('#top-title').textContent = title; const b = $('#back'); b.hidden = !back; b.onclick = () => { if (typeof back === 'string') location.hash = back; else history.back(); }; document.title = title + ' · Académie de français'; }
 
   /* ---------- concept markup ---------- */
   function renderConcept(h) {
@@ -49,6 +49,12 @@
     const f = e.target.closest('.concept .fr.tap, .tbl-wrap td .fr, .gloss .fr, .conj .l'); if (f && !e.target.closest('button')) FR.tts.say(f.dataset.say || f.textContent.replace(/^(je|tu|il|nous|vous|ils)\s*$/, ''));
   });
   $('#modal').addEventListener('click', (e) => { if (e.target.id === 'modal') FR.closeModal(); });
+
+  function rankCard() {
+    const p = S().pts || 0, r = FR.rank(p), pct = r.next ? Math.round(((p - r.min) / (r.next[0] - r.min)) * 100) : 100;
+    return `<div class="card rank-card"><div class="row between"><div><div class="eyebrow">Your rank</div><div class="rank">${esc(r.name)}</div><div class="dim" style="font-size:13px">${esc(r.desc)}</div></div><div style="text-align:right"><div class="eyebrow">Points</div><div class="rank" style="color:var(--gold)">✦ ${p}</div></div></div>
+      <div class="progress" style="margin-top:12px"><i style="width:${pct}%"></i></div><div class="dim" style="font-size:12px;margin-top:6px">${r.next ? (r.next[0] - p) + ' points to ' + esc(r.next[1]) : 'Highest rank reached'} · correct answer +2 · block +15 · full day +50 · mastery +25/40</div></div>`;
+  }
 
   /* ======================= TODAY ======================= */
   function blockLinks(k, d) {
@@ -88,6 +94,7 @@
         ${mist ? `<div class="list-row"><div class="grow"><b>${mist} past mistakes</b><div class="dim" style="font-size:13px">Get each one right to clear it</div></div><a class="btn sm" href="#/quiz?mode=mistakes">Fix them</a></div>` : ''}</div>` : ''}
       <div class="card"><div class="row between"><h3 style="margin:0">20-day map</h3><span class="dim" style="font-size:12px">tap a day</span></div><div class="days" style="margin-top:12px">${grid}</div>
         <div class="row" style="margin-top:12px;gap:14px;font-size:12px;color:var(--tx3)"><span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#1b1a12"></i> started</span><span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#2b2614"></i> practised</span><span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#12251a"></i> solid</span></div></div>
+      ${rankCard()}
       <div class="grid g3"><div class="card tight stat"><b>${FR.streak()}</b><span>day streak (30m+)</span></div><div class="card tight stat"><b>${FR.fmtMin(FR.totalSec())}</b><span>total active time</span></div><div class="card tight stat"><b>${c + w ? Math.round((c / (c + w)) * 100) : 0}%</b><span>accuracy · ${c + w} answers</span></div></div>`;
     $$('.tick', main).forEach((t) => (t.onclick = () => { const r = FR.dayRec(d); r.blocks[t.dataset.k] = !r.blocks[t.dataset.k]; FR.save(); pageToday(); }));
   }
@@ -478,7 +485,9 @@
       FR.runSet({ el: main, items: gi.concat(rd, ls, dc, sq), title: M.title, mode: 'mock',
         onResult: (r) => {
           if (r.quit && r.n < (gi.length / 2)) return;
-          const m = (S().mocks[id] = S().mocks[id] || { best: 0 }); m.best = Math.max(m.best, r.pct); m.last = r.pct; m.at = Date.now(); FR.save(true);
+          const m = (S().mocks[id] = S().mocks[id] || { best: 0 }); const first80 = r.pct >= 80 && m.best < 80; m.best = Math.max(m.best, r.pct); m.last = r.pct; m.at = Date.now();
+          if (first80) { FR.addPts(100); setTimeout(() => FR.celebrate(3, esc(M.title) + ' passed', r.pct + '% · +100 points'), 600); }
+          FR.save(true);
           setTimeout(() => { const box = document.createElement('div'); box.className = 'card'; box.innerHTML = `<h4>Now finish the exam</h4><p><b>Writing (20 min):</b> <a href="#/write/${M.write}">${esc(WRITING.find((w) => w.id === M.write).title)}</a></p><p style="margin-bottom:0"><b>Speaking (5 min):</b> record yourself for 2 minutes answering: ${id === 'a1' ? '"Présentez-vous et décrivez votre journée typique."' : id === 'a2' ? '"Racontez votre dernier week-end ou un voyage mémorable."' : '"Racontez votre parcours, votre situation actuelle et vos projets. Donnez un conseil à un nouvel arrivant."'} Use the recorder in any shadowing page, or your phone. Listen back and count tense errors.</p>`; const w = main.querySelector('.ex-wrap'); if (w) w.insertBefore(box, w.children[1]); }, 0);
         }, onQuit: () => { location.hash = '#/practice'; } });
     };
@@ -501,6 +510,7 @@
       <div class="card" id="acct">${c ? `<div class="row between"><div><div class="eyebrow">Cloud save</div><b>${esc(c.name)}</b></div><span class="sync-dot ${cs.err ? 'err' : 'on'}"></span></div>
         <p class="dim">Progress syncs automatically about every 20 seconds after changes, and when you leave the page. Last synced: ${c.at ? new Date(c.at).toLocaleString() : 'not yet'}.${cs.err ? ' <span style="color:var(--bad)">' + esc(cs.err) + '</span>' : ''}</p>
         <div class="row"><button class="btn pri" id="sync">Sync now</button><button class="btn ghost" id="out">Sign out</button></div>` : authForm(false)}</div>
+      ${rankCard()}
       <div class="grid g3"><div class="card tight stat"><b>${FR.fmtMin(FR.totalSec())}</b><span>active time</span></div><div class="card tight stat"><b>${FR.streak()}</b><span>day streak</span></div><div class="card tight stat"><b>${cc + ww ? Math.round((cc / (cc + ww)) * 100) : 0}%</b><span>accuracy (${cc + ww})</span></div><div class="card tight stat"><b>${learned}</b><span>cards learned</span></div><div class="card tight stat"><b>${Object.keys(st.wr).length}</b><span>texts written</span></div><div class="card tight stat"><b>${st.mist.filter((i) => FR.EX[i]).length}</b><span>open mistakes</span></div></div>
       <div class="card"><h3 style="margin-top:0">Mastery tracker</h3><p class="dim" style="margin-top:0">0 not started · 1 introduced · 2 developing (&lt;80%) · 3 usable (80%+) · 4 retained (passed again on a later day)</p>
         ${LESSONS.map((L) => { const m = FR.mastery(L.day), r = st.les[L.day], nr = FR.nextReview(L.day); return `<a class="list-row" href="#/lesson/${L.day}/practice" style="color:var(--tx)"><span class="tag">D${L.day}</span><div class="grow" style="font-size:14px">${esc(L.title)}<div class="dim" style="font-size:12px">${r && r.tries ? 'best ' + r.best + '% · ' + r.tries + ' tries' : 'no attempts'}${nr ? ' · retest ' + nr.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}</div></div>${FR.masteryDots(m)}</a>`; }).join('')}</div>
@@ -513,7 +523,8 @@
         <label>Text size</label><div class="seg">${[15, 16, 17, 18].map((f) => `<button data-f="${f}" class="${st.font === f ? 'on' : ''}">${f}</button>`).join('')}</div>
         <label style="display:flex;gap:10px;align-items:center;margin-top:14px"><input type="checkbox" id="as" ${st.autoSay !== false ? 'checked' : ''}> Auto-play audio on flashcards</label></div>
       <div class="card"><h3 style="margin-top:0">Data</h3><p class="dim" style="margin-top:0">Save code: copy your progress to paste on another device without an account.</p>
-        <div class="row"><button class="btn sm" id="cp">Copy save code</button><button class="btn sm" id="ld">Load a save code</button><button class="btn sm ghost" id="rs" style="color:var(--bad)">Reset this device</button></div></div>
+        ${FR.getBackup() ? `<p class="dim" style="font-size:13px">Safety backup from ${new Date(FR.getBackup().at).toLocaleString()} (${esc(FR.getBackup().why)}). A backup is taken automatically before any sync merge, code load or reset.</p>` : ''}
+        <div class="row"><button class="btn sm" id="cp">Copy save code</button>${FR.getBackup() ? '<button class="btn sm" id="rb">Restore backup</button>' : ''}<button class="btn sm" id="ld">Load a save code</button><button class="btn sm ghost" id="rs" style="color:var(--bad)">Reset this device</button></div></div>
       <p class="dim" style="font-size:12px;text-align:center">Built for the 20-day A1 → A2 → B1 plan · 3 hours a day.</p>`;
     bindAuth(false);
     if (c) { $('#sync').onclick = async () => { $('#sync').textContent = 'Syncing…'; const ok = await FR.cloud.sync(); FR.toast(ok ? 'Synced.' : 'Sync failed.', ok ? 'ok' : 'bad'); pageMe(); }; $('#out').onclick = async () => { await FR.cloud.logout(); topRight(); pageMe(); }; }
@@ -524,7 +535,8 @@
     $$('[data-f]', main).forEach((b) => (b.onclick = () => { st.font = +b.dataset.f; applyFont(); FR.save(); pageMe(); }));
     $('#as').onchange = (e) => { st.autoSay = e.target.checked; FR.save(); };
     $('#cp').onclick = () => { const code = FR.packSave(); (navigator.clipboard ? navigator.clipboard.writeText(code) : Promise.reject()).then(() => FR.toast('Save code copied.', 'ok')).catch(() => FR.modal(`<h3>Save code</h3><textarea readonly style="min-height:160px">${esc(code)}</textarea><button class="btn" onclick="FR.closeModal()">Close</button>`)); };
-    $('#ld').onclick = () => { FR.modal(`<h3>Load a save code</h3><p class="dim">This replaces the progress on this device.</p><textarea id="lc" placeholder="FR1.…" style="min-height:140px"></textarea><div class="row" style="margin-top:10px"><button class="btn pri" id="lcg">Load</button><button class="btn ghost" onclick="FR.closeModal()">Cancel</button></div>`); $('#lcg').onclick = () => { const o = FR.unpackSave($('#lc').value); if (!o) return FR.toast('That is not a valid save code.', 'bad'); FR.setState(o); FR.closeModal(); FR.save(true); FR.toast('Progress loaded.', 'ok'); route(); }; };
+    $('#ld').onclick = () => { FR.modal(`<h3>Load a save code</h3><p class="dim">The code is combined with this device's progress. Nothing is lost.</p><textarea id="lc" placeholder="FR1.…" style="min-height:140px"></textarea><div class="row" style="margin-top:10px"><button class="btn pri" id="lcg">Load</button><button class="btn ghost" onclick="FR.closeModal()">Cancel</button></div>`); $('#lcg').onclick = () => { const o = FR.unpackSave($('#lc').value); if (!o) return FR.toast('That is not a valid save code.', 'bad'); FR.setState(FR.merge(FR.S(), o), 'save code'); FR.closeModal(); FR.save(true); FR.toast('Progress combined.', 'ok'); route(); }; };
+    const rbb = $('#rb'); if (rbb) rbb.onclick = (e) => { if (!e.target.dataset.sure) { e.target.dataset.sure = 1; e.target.textContent = 'Tap again to restore'; return; } const b = FR.getBackup(); FR.setState(b.data, 'before restore'); FR.save(true); FR.toast('Backup restored.', 'ok'); route(); };
     $('#rs').onclick = (e) => { const b = e.target; if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'Tap again to erase this device'; return; } FR.resetLocal(); FR.toast('This device was reset.'); route(); };
   }
   function authForm(welcome) {
@@ -544,15 +556,10 @@
       if (!r.ok) { msg.style.color = 'var(--bad)'; msg.textContent = r.msg; return; }
       const st = S(); st.welcomed = true;
       if (mode === 'login' && r.data) {
-        if (FR.isFresh(st)) { FR.setState(Object.assign(r.data, { welcomed: true })); FR.toast('Welcome back, <b>' + esc(r.name) + '</b>. Progress loaded.', 'ok'); }
-        else {
-          FR.modal(`<h3>Two saves found</h3><p>This device has progress, and so does the cloud for <b>${esc(r.name)}</b>. Which one do you keep?</p>
-            <p class="dim" style="font-size:13px">Cloud: last saved ${r.data.savedAt ? new Date(r.data.savedAt).toLocaleString() : '?'}<br>This device: last saved ${new Date(st.savedAt).toLocaleString()}</p>
-            <div class="row"><button class="btn pri" id="kc">Use the cloud save</button><button class="btn" id="kd">Keep this device</button></div>`);
-          $('#kc').onclick = () => { FR.setState(Object.assign(r.data, { welcomed: true })); FR.closeModal(); FR.toast('Cloud save loaded.', 'ok'); route(); };
-          $('#kd').onclick = async () => { FR.closeModal(); await FR.cloud.sync(); FR.toast('This device\'s progress is now in the cloud.', 'ok'); route(); };
-          return;
-        }
+        if (FR.isFresh(st)) FR.setState(Object.assign(r.data, { welcomed: true }), 'sign-in');
+        else FR.setState(FR.merge(st, r.data), 'sign-in merge');
+        await FR.cloud.sync();
+        FR.toast('Welcome back, <b>' + esc(r.name) + '</b>. Progress from this device and the cloud was combined.', 'ok');
       } else { FR.toast(mode === 'register' ? 'Account created. Progress will sync.' : 'Signed in.', 'ok'); await FR.cloud.sync(); }
       FR.save(true); topRight();
       if (welcome) location.hash = '#/'; route();
@@ -562,7 +569,7 @@
   function pageWelcome() {
     setTop('Français A2 → B1');
     $('#tabs').style.display = 'none';
-    main.innerHTML = `<div class="welcome"><div class="big">Français, <em>vingt jours</em>.</div>
+    main.innerHTML = `<div class="welcome"><div class="big">L'Académie<br><em>de français</em></div>
       <p class="dim">A 20-day, 3-hours-a-day plan from A1 basics to a strong A2, with the bridge into B1. Grammar with audio, concept maps, quizzes, flashcards, stories, listening, shadowing, dictation and writing.</p>
       <div class="card">${authForm(true)}</div>
       <button class="btn ghost block" id="skip">Continue without an account</button>

@@ -323,3 +323,5 @@ td .fr { font-size: 1em; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 .fr.tap, td .fr { cursor: pointer; } .fr.tap:hover { color: var(--gold); } .conj .l:hover { color: var(--gold); }
+
+@media (max-width: 420px) { .hide-sm { display: none; } }

@@ -1,0 +1,90 @@
+/* Magic-academy theme: midnight sky, candle gold, spellbook cards. Still dark and low-glare. */
+:root {
+  --bg: #04050a; --bg1: #0b0c13; --bg2: #12131c; --bg3: #1a1b27;
+  --line: #1f2131; --line2: #2b2d42;
+  --tx: #d8d3c6; --tx2: #a29d90; --tx3: #6e6a62;
+  --gold: #e6c47c; --gold2: #b8964f;
+  --display: "Cinzel", "Trajan Pro", "Iowan Old Style", Georgia, serif;
+}
+html { background: #04050a; }
+body { background: radial-gradient(ellipse 120% 70% at 50% -10%, #111427 0%, #07080f 45%, #04050a 75%) fixed; }
+#app { position: relative; z-index: 1; }
+#sky { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+#sky i { position: absolute; width: 2px; height: 2px; border-radius: 50%; background: #fff6dc; box-shadow: 0 0 4px #fff3c4; animation: twinkle 6s ease-in-out infinite; }
+@keyframes twinkle { 0%, 100% { opacity: .15; } 50% { opacity: .7; } }
+#fx { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 70; }
+
+/* type */
+h1, .welcome .big, .brand b, .sum-big, .spell-inc { font-family: var(--display); letter-spacing: .02em; }
+h1 { color: #f2e4bf; font-weight: 600; text-shadow: 0 0 24px rgba(230, 196, 124, .12); }
+.hero h1::after { content: "✦  ✧  ✦"; display: block; font-size: .7rem; letter-spacing: .6em; color: var(--gold2); margin-top: 10px; opacity: .8; }
+.eyebrow, .tile .k, .q-type, .concept h3 { font-family: var(--display); letter-spacing: .14em; }
+.top-title { font-family: var(--display); letter-spacing: .03em; }
+
+/* surfaces: spellbook pages */
+#top, #tabs { background: rgba(5, 6, 12, .9); border-color: #1d1f30; }
+#side { background: linear-gradient(180deg, #080912, #04050a); border-color: #1d1f30; }
+.card, .tile, .opt, .seq-item, .fc-face, .player, .note, .modal-card, .tbl-wrap, .node {
+  background: linear-gradient(180deg, rgba(19, 20, 31, .92), rgba(10, 11, 18, .94));
+  border-color: #23253a;
+  box-shadow: inset 0 0 0 1px rgba(230, 196, 124, .035), 0 10px 30px -18px rgba(0, 0, 0, .9);
+}
+.tile:hover, .opt:hover:not(:disabled) { border-color: #4a3f25; box-shadow: inset 0 0 0 1px rgba(230, 196, 124, .08), 0 0 22px -8px rgba(230, 196, 124, .25); }
+.tile.today { border-color: #5a4a26; background: linear-gradient(180deg, rgba(36, 30, 16, .7), rgba(14, 12, 8, .9)); box-shadow: 0 0 26px -10px rgba(230, 196, 124, .35); }
+.fc-back { background: linear-gradient(180deg, #1a160c, #0d0b06); border-color: #4a3e22; }
+.node.root { background: linear-gradient(180deg, #221c0e, #110e07); }
+.feedback.ok { box-shadow: 0 0 24px -12px rgba(134, 199, 154, .6); }
+
+/* buttons and controls */
+.btn.pri { background: linear-gradient(180deg, #f0d391, #c9a457); border-color: #d9b56a; color: #1a1306; box-shadow: 0 0 0 1px rgba(255, 233, 168, .15) inset, 0 6px 22px -10px rgba(230, 196, 124, .6); }
+.btn.pri:hover { background: linear-gradient(180deg, #f7e0a7, #d4b066); box-shadow: 0 0 26px -6px rgba(230, 196, 124, .55); }
+.progress { background: #161724; }
+.progress > i { background: linear-gradient(90deg, #a8843e, #f3d58b, #a8843e); background-size: 200% 100%; animation: shimmer 3.5s linear infinite; box-shadow: 0 0 10px rgba(230, 196, 124, .35); }
+.progress.ok > i { background: linear-gradient(90deg, #4d8a60, #9be0b0, #4d8a60); background-size: 200% 100%; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+#tabs a.on svg, #nav a.on svg { filter: drop-shadow(0 0 6px rgba(230, 196, 124, .6)); }
+#nav a.on { background: linear-gradient(90deg, rgba(230, 196, 124, .12), transparent); }
+.lesson-tabs { background: transparent; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.lesson-tabs button.on { box-shadow: 0 0 14px -4px rgba(230, 196, 124, .4); }
+.days a.cur { box-shadow: 0 0 12px rgba(230, 196, 124, .5); }
+
+/* brand */
+.logo { background: radial-gradient(circle at 50% 35%, #2a2210, #0d0b06); border-color: #4a3e22; box-shadow: 0 0 18px -4px rgba(230, 196, 124, .45); animation: candle 4s ease-in-out infinite; }
+.logo svg { width: 22px; height: 22px; color: var(--gold); }
+@keyframes candle { 0%, 100% { box-shadow: 0 0 14px -4px rgba(230, 196, 124, .35); } 50% { box-shadow: 0 0 22px -2px rgba(230, 196, 124, .6); } }
+#pts { font-variant-numeric: tabular-nums; }
+#pts.pop { animation: pop .6s ease; }
+@keyframes pop { 30% { transform: scale(1.25); color: #fff3c4; border-color: var(--gold); } }
+.rank-card .rank { font-family: var(--display); font-size: 1.5rem; color: #f2e4bf; }
+
+/* spell banner */
+.spell { position: fixed; z-index: 80; left: 50%; top: 22%; transform: translate(-50%, 0) scale(.9); opacity: 0; animation: spellIn .45s cubic-bezier(.2, .9, .3, 1.2) forwards; text-align: center; padding: 18px 26px; min-width: 240px; max-width: 88vw; border-radius: 16px; cursor: pointer;
+  background: radial-gradient(ellipse at top, rgba(44, 36, 16, .97), rgba(12, 10, 6, .97)); border: 1px solid #6b5627; box-shadow: 0 0 0 1px rgba(255, 233, 168, .08) inset, 0 0 60px -10px rgba(230, 196, 124, .55), 0 20px 50px rgba(0, 0, 0, .7); }
+.spell::before, .spell::after { content: "✦"; position: absolute; top: 10px; color: var(--gold2); font-size: 12px; }
+.spell::before { left: 12px; } .spell::after { right: 12px; }
+.spell-inc { font-size: 1.35rem; color: #f6dc97; text-shadow: 0 0 18px rgba(246, 220, 151, .5); }
+.spell.l3 .spell-inc { font-size: 1.6rem; }
+.spell-t { margin-top: 6px; color: #efe6cf; font-family: var(--serif); font-size: 1.08rem; }
+.spell-s { margin-top: 2px; color: var(--tx2); font-size: .9rem; }
+.spell.out { animation: spellOut .45s ease forwards; }
+@keyframes spellIn { to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
+@keyframes spellOut { to { opacity: 0; transform: translate(-50%, -14px) scale(.96); } }
+
+/* owl flyover */
+.owl-fly { position: fixed; z-index: 75; left: -140px; top: 62%; width: 120px; pointer-events: none; animation: owlFly 4s cubic-bezier(.45, .05, .55, .95) forwards; filter: drop-shadow(0 0 10px rgba(0, 0, 0, .6)); }
+.owl-fly svg { width: 120px; height: 90px; overflow: visible; }
+.owl .body { fill: #7a6546; } .owl .wing path { fill: #5c4b33; stroke: #8f7752; stroke-width: 1; }
+.owl .ear { fill: none; stroke: #7a6546; stroke-width: 3; stroke-linejoin: round; }
+.owl .eyeo { fill: #f2d48a; } .owl .eye { fill: #1a1308; } .owl .beak { fill: #c99a3e; }
+.owl .letter rect { fill: #efe2c2; } .owl .letter path { fill: none; stroke: #b9a678; stroke-width: 1; } .owl .seal { fill: #9b2e2e; }
+.owl .wl { transform-origin: 58px 46px; animation: flapL .32s ease-in-out infinite alternate; }
+.owl .wr { transform-origin: 62px 46px; animation: flapR .32s ease-in-out infinite alternate; }
+@keyframes flapL { from { transform: rotate(18deg); } to { transform: rotate(-22deg); } }
+@keyframes flapR { from { transform: rotate(-18deg); } to { transform: rotate(22deg); } }
+@keyframes owlFly { 0% { transform: translate(0, 0); } 45% { transform: translate(55vw, -30vh); } 100% { transform: translate(calc(100vw + 280px), -46vh); } }
+
+/* welcome */
+.welcome .big { font-size: 2.3rem; color: #f2e4bf; }
+.welcome .big em { font-family: var(--serif); text-transform: none; }
+
+@media (prefers-reduced-motion: reduce) { #sky i, .progress > i, .logo { animation: none !important; } }

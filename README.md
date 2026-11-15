@@ -17,3 +17,9 @@ Progress saves in the browser (`fr-prep-v1`). Optional cloud save uses the same 
 ## Files
 - `js/data/lessons1-3.js` lessons · `stories.js` · `vocab.js` · `verbs.js` (conjugation engine) · `writing.js`
 - `js/core.js` state, cloud, speech, SRS · `js/engine.js` exercises, cards, shadowing · `js/pages.js` pages and router
+
+## Progress safety (for future edits)
+- Save key `fr-prep-v1` never changes. New fields get defaults; old saves are migrated by `FR.adopt` (v1 index ids → content ids).
+- Exercise and card ids come from their text, so adding, removing or reordering content never shifts anyone's stats. Editing one question's text only resets that one question.
+- Cloud, save codes and sign-in always **merge** (`FR.merge`: best scores, union of passes and blocks, max time), never overwrite. A backup is stored in `fr-prep-backup` before any merge/reset and can be restored from Me.
+- Asset URLs carry `?v=N`; bump N on each release so all files update together.

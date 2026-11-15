@@ -49,11 +49,14 @@
 
   /* ---------- state ---------- */
   const SAVE_KEY = 'fr-prep-v1';
-  const fresh = () => ({ v: 1, savedAt: 0, start: '2026-11-11', rate: 0.9, voice: '', font: 16, welcomed: false, ex: {}, les: {}, srs: {}, days: {}, st: {}, wr: {}, mocks: {}, mist: [], log: {}, drill: { c: 0, n: 0 } });
-  function load() { try { const o = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); return o && o.v ? Object.assign(fresh(), o) : null; } catch (e) { return null; } }
-  let S = load() || fresh();
+  const fresh = () => ({ v: 1, idv: 2, pts: 0, savedAt: 0, start: '2026-11-11', rate: 0.9, voice: '', font: 16, welcomed: false, ex: {}, les: {}, srs: {}, days: {}, st: {}, wr: {}, mocks: {}, mist: [], log: {}, drill: { c: 0, n: 0 } });
+  function load() { try { const o = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); return o && o.v ? o : null; } catch (e) { return null; } }
+  let S = load() || fresh(); // raw save; normalized by FR.adopt once content ids are known (below)
   FR.S = () => S;
-  FR.setState = (o) => { S = Object.assign(fresh(), o); saveLocal(); };
+  const BACKUP_KEY = 'fr-prep-backup';
+  FR.backup = (why) => { try { if (!FR.isFresh(S)) localStorage.setItem(BACKUP_KEY, JSON.stringify({ at: Date.now(), why, data: S })); } catch (e) { /* storage blocked */ } };
+  FR.getBackup = () => { try { return JSON.parse(localStorage.getItem(BACKUP_KEY) || 'null'); } catch (e) { return null; } };
+  FR.setState = (o, why) => { FR.backup(why || 'replace'); S = FR.adopt(o); saveLocal(); };
   let storageOk = true;
   function saveLocal() { S.savedAt = Date.now(); try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); storageOk = true; } catch (e) { storageOk = false; } }
   FR.storageOk = () => storageOk;
@@ -61,7 +64,7 @@
   FR.isFresh = (o) => !o || (!Object.keys(o.ex || {}).length && !Object.keys(o.srs || {}).length && !Object.keys(o.log || {}).length);
   FR.packSave = () => 'FR1.' + btoa(unescape(encodeURIComponent(JSON.stringify(S))));
   FR.unpackSave = (code) => { try { const o = JSON.parse(decodeURIComponent(escape(atob(code.trim().slice(4))))); return o && o.v ? o : null; } catch (e) { return null; } };
-  FR.resetLocal = () => { S = fresh(); S.welcomed = true; saveLocal(); };
+  FR.resetLocal = () => { FR.backup('reset'); S = fresh(); S.welcomed = true; S.idv = 2; saveLocal(); };
 
   /* ---------- day / plan ---------- */
   FR.curDay = () => { const st = new Date(S.start + 'T00:00:00'); const d = Math.floor((new Date().setHours(0, 0, 0, 0) - st.getTime()) / DAY) + 1; return Math.max(1, Math.min(20, d)); };
@@ -100,9 +103,11 @@
     else if (t[0] === 'w') Object.assign(o, { t: 'write', en: t[1], a: [].concat(t[2]), why: t[3] });
     return o;
   }
+  // Stable ids from content (not position), so edits elsewhere never shift your stats. OLD maps v1 index ids → v2 ids.
+  const fh = window.__fh, OLD = (FR.OLDIDS = {});
   const EX = {};
-  LESSONS.forEach((L) => L.ex.forEach((t, i) => { const id = 'L' + L.day + '-' + i; EX[id] = normEx(t, id, { lesson: L.day }); }));
-  STORIES.forEach((s) => s.q.forEach((t, i) => { const id = 'S' + s.id + '-' + i; EX[id] = normEx(t, id, { story: s.id }); }));
+  LESSONS.forEach((L) => L.ex.forEach((t, i) => { const id = 'L' + L.day + '-' + fh(t[0] + t[1]); OLD['L' + L.day + '-' + i] = id; EX[id] = normEx(t, id, { lesson: L.day }); }));
+  STORIES.forEach((s) => s.q.forEach((t, i) => { const id = 'S' + s.id + '-' + fh(t[0] + t[1]); OLD['S' + s.id + '-' + i] = id; EX[id] = normEx(t, id, { story: s.id }); }));
   FR.EX = EX;
   FR.lessonEx = (day) => Object.values(EX).filter((e) => e.src.lesson === day);
   FR.storyEx = (sid) => Object.values(EX).filter((e) => e.src.story === sid);
@@ -171,13 +176,13 @@
 
   /* ---------- flashcards (Leitner) ---------- */
   const IV = [0, 1, 2, 4, 8, 16, 35];
-  FR.VERB_DECK = { id: 'verbs', name: 'Verb bank (infinitives + participles)', day: 0, cards: VERBS.map((v, i) => ({ id: 'verbs-' + i, fr: v.i, en: v.e + ' · p.p. ' + CONJ.participle(v) + ' (' + CONJ.aux(v) + ')' })) };
+  FR.VERB_DECK = { id: 'verbs', name: 'Verb bank (infinitives + participles)', day: 0, cards: VERBS.map((v, i) => ({ id: 'verbs-' + fh(v.i), old: 'verbs-' + i, fr: v.i, en: v.e + ' · p.p. ' + CONJ.participle(v) + ' (' + CONJ.aux(v) + ')' })) };
   /* ---------- speaking topics ---------- */
   const lines = (t) => String(t || '').trim().split('\n').map((l) => l.split('|').map((x) => x.trim())).filter((r) => r[0]);
   FR.SPEAK = (window.SPEAK || []).sort((a, b) => a.day - b.day).map((t) => Object.assign({}, t, { V: lines(t.v), X: lines(t.x), P: lines(t.p), E: lines(t.e), Q: lines(t.q), O: lines(t.o) }));
   FR.speak = (d) => FR.SPEAK.find((t) => t.day === +d);
   FR.SPEAK_DECKS = {};
-  FR.SPEAK.forEach((t) => { FR.SPEAK_DECKS['sp' + t.day] = { id: 'sp' + t.day, name: 'Speaking ' + t.day + ': ' + t.title, day: t.day, speak: true, cards: t.V.concat(t.X).map((r, i) => ({ id: 'sp' + t.day + '-' + i, fr: r[0], en: r[1] || '' })) }; });
+  FR.SPEAK.forEach((t) => { FR.SPEAK_DECKS['sp' + t.day] = { id: 'sp' + t.day, name: 'Speaking ' + t.day + ': ' + t.title, day: t.day, speak: true, cards: t.V.concat(t.X).map((r, i) => ({ id: 'sp' + t.day + '-' + fh(r[0]), old: 'sp' + t.day + '-' + i, fr: r[0], en: r[1] || '' })) }; });
   FR.deck = (id) => (id === 'verbs' ? FR.VERB_DECK : DECKS[id] || FR.SPEAK_DECKS[id]);
   FR.allDecks = () => Object.values(DECKS).concat(Object.values(FR.SPEAK_DECKS), [FR.VERB_DECK]);
   FR.cardDue = (c) => { const r = S.srs[c.id]; return !r || r.due <= Date.now(); };
@@ -249,7 +254,10 @@
       try {
         const r = await Promise.race([rpc('fr_load', { p_token: cloud.token }), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 6000))]);
         if (!r.ok) { cloud = null; storeCloud(); return 'expired'; }
-        if (r.data && (r.data.savedAt || 0) > (S.savedAt || 0) + 2000) { S = Object.assign(fresh(), r.data); try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* blocked */ } return 'pulled'; }
+        if (r.data && !FR.isFresh(r.data) && (r.data.savedAt || 0) !== (S.savedAt || 0)) {
+          // Never overwrite: merge this device with the cloud, keeping the best of both, then push the result.
+          FR.backup('before cloud merge'); S = FR.merge(S, r.data); saveLocal(); doPush(false); return 'pulled';
+        }
         return 'ok';
       } catch (e) { return 'offline'; }
     }
@@ -257,6 +265,43 @@
   const leaving = () => { saveLocal(); if (cloud) doPush(true); };
   addEventListener('visibilitychange', () => { if (document.hidden) leaving(); });
   addEventListener('pagehide', leaving);
+
+  /* ---------- progress safety: migration + merge ---------- */
+  const CARD_OLD = {};
+  FR.allDecks().forEach((d) => d.cards.forEach((c) => { if (c.old) CARD_OLD[c.old] = c.id; }));
+  FR.adopt = (raw) => {
+    const v1 = !raw || !raw.idv;
+    const o = Object.assign(fresh(), raw || {});
+    if (v1 && raw) { // v1 used position-based ids; remap them once to content-based ids
+      const ex = {}; Object.entries(o.ex || {}).forEach(([k, v]) => { ex[OLD[k] || k] = v; }); o.ex = ex;
+      o.mist = (o.mist || []).map((k) => OLD[k] || k);
+      const srs = {}; Object.entries(o.srs || {}).forEach(([k, v]) => { srs[CARD_OLD[k] || k] = v; }); o.srs = srs;
+      o.idv = 2;
+    }
+    return o;
+  };
+  const later = (a, b, f) => (!a ? b : !b ? a : ((b[f] || 0) > (a[f] || 0) ? b : a));
+  FR.merge = (A, B) => {
+    A = FR.adopt(A); B = FR.adopt(B);
+    const newer = (B.savedAt || 0) > (A.savedAt || 0) ? B : A, older = newer === A ? B : A;
+    const o = Object.assign(fresh(), older, newer); // settings from the newer save
+    const keys = (x, y) => Array.from(new Set(Object.keys(x || {}).concat(Object.keys(y || {}))));
+    o.ex = {}; keys(A.ex, B.ex).forEach((k) => { const a = A.ex[k], b = B.ex[k]; o.ex[k] = !a || !b ? (a || b) : Object.assign({}, later(a, b, 't'), { c: Math.max(a.c, b.c), w: Math.max(a.w, b.w) }); });
+    o.les = {}; keys(A.les, B.les).forEach((k) => { const a = A.les[k] || {}, b = B.les[k] || {}; o.les[k] = Object.assign({}, later(a, b, 'last'), { seen: Math.max(a.seen || 0, b.seen || 0), best: Math.max(a.best || 0, b.best || 0), tries: Math.max(a.tries || 0, b.tries || 0), pass: Array.from(new Set((a.pass || []).concat(b.pass || []))).sort() }); });
+    o.srs = {}; keys(A.srs, B.srs).forEach((k) => { const a = A.srs[k], b = B.srs[k]; o.srs[k] = !a || !b ? (a || b) : ((b.n || 0) > (a.n || 0) ? b : a); });
+    o.days = {}; keys(A.days, B.days).forEach((k) => { const a = A.days[k] || {}, b = B.days[k] || {}; o.days[k] = Object.assign({}, a, b, { blocks: Object.assign({}, a.blocks, b.blocks), sec: Math.max(a.sec || 0, b.sec || 0), shadowN: Math.max(a.shadowN || 0, b.shadowN || 0), spokeN: Math.max(a.spokeN || 0, b.spokeN || 0) }); });
+    o.log = {}; keys(A.log, B.log).forEach((k) => { o.log[k] = Math.max((A.log || {})[k] || 0, (B.log || {})[k] || 0); });
+    o.st = {}; keys(A.st, B.st).forEach((k) => { const a = A.st[k] || {}, b = B.st[k] || {}; const m = Object.assign({}, a, b); ['quiz', 'listen', 'shadow', 'read'].forEach((f) => { if (a[f] != null || b[f] != null) m[f] = Math.max(a[f] || 0, b[f] || 0); }); o.st[k] = m; });
+    o.wr = {}; keys(A.wr, B.wr).forEach((k) => { o.wr[k] = later(A.wr[k], B.wr[k], 'at'); });
+    o.mocks = {}; keys(A.mocks, B.mocks).forEach((k) => { const a = A.mocks[k] || {}, b = B.mocks[k] || {}; o.mocks[k] = Object.assign({}, later(a, b, 'at'), { best: Math.max(a.best || 0, b.best || 0) }); });
+    o.sp = {}; keys(A.sp, B.sp).forEach((k) => { o.sp[k] = { q: Math.max(((A.sp || {})[k] || {}).q || 0, ((B.sp || {})[k] || {}).q || 0) }; });
+    o.drill = { c: Math.max((A.drill || {}).c || 0, (B.drill || {}).c || 0), n: Math.max((A.drill || {}).n || 0, (B.drill || {}).n || 0) };
+    o.pts = Math.max(A.pts || 0, B.pts || 0);
+    o.mist = newer.mist || [];
+    o.welcomed = true; o.idv = 2; o.savedAt = Date.now();
+    return o;
+  };
+  S = FR.adopt(S); try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* storage blocked */ }
 
   /* ---------- verb drill helpers ---------- */
   FR.TENSE_DAY = { present: 1, futurproche: 8, pc: 9, imparfait: 12, futur: 17, conditionnel: 18 };

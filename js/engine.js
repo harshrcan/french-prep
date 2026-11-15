@@ -140,6 +140,7 @@
       const ov = el.querySelector('[data-a=override]'); if (ov) ov.onclick = () => { r.score = 1; const rec = FR.S().ex[ex.id]; if (rec) { rec.w = Math.max(0, rec.w - 1); rec.c++; rec.ok = true; } FR.S().mist = FR.S().mist.filter((x) => x !== ex.id); ov.parentNode.innerHTML = '<span class="pill ok">Counted as correct. Compare with the model anyway.</span>'; };
       const sc = el.querySelector('#fb .feedback'); if (sc && sc.getBoundingClientRect().bottom > innerHeight) sc.scrollIntoView({ behavior: 'smooth', block: 'center' });
       if (r.score >= 1 && (ex.t === 'order' || ex.t === 'write')) FR.tts.say(best);
+      if (r.score >= 1 && FR.sparkle) FR.sparkle(el.querySelector('#fb .feedback'));
     }
     function finish(quit) {
       FR.save(true);
@@ -148,6 +149,7 @@
       if (quit && !n) { opt.onQuit ? opt.onQuit() : history.back(); return; }
       const result = { pct, n, total, res, quit };
       if (opt.onResult) opt.onResult(result);
+      if (FR.onSetDone) setTimeout(() => FR.onSetDone(result, opt.title), 250);
       const wrong = res.filter((r) => r.score < 1);
       const secs = {};
       res.forEach((r) => { const s = r.ex.sec || ''; if (!s) return; secs[s] = secs[s] || [0, 0]; secs[s][0] += r.score; secs[s][1]++; });
@@ -227,6 +229,7 @@
     function end() {
       FR.save(true);
       if (done >= 10) FR.markBlock('vocab');
+      if (done >= 5 && FR.celebrate) FR.celebrate(done >= 20 ? 2 : 1, 'Cards reviewed', done + ' reviews');
       const st = FR.deckStats(d);
       el.innerHTML = `<div class="ex-wrap"><div class="card" style="text-align:center;padding:28px"><div class="eyebrow">${esc(d.name)}</div><div class="sum-big">${done}</div><div class="dim">reviews · ${again} relearned</div><p>Learned (box 3+): <b>${st.learned}</b> / ${st.total}</p></div>
         <div class="row"><a class="btn pri" href="#/cards">All decks</a><button class="btn" data-a="cram">Cram again</button></div></div>`;
@@ -293,6 +296,7 @@
       if (opt.sid) { const r = (S.st[opt.sid] = S.st[opt.sid] || {}); r.shadow = (r.shadow || 0) + done.size; }
       const dr = FR.dayRec(FR.curDay()); dr.shadowN = (dr.shadowN || 0) + done.size;
       if (dr.shadowN >= 6) FR.markBlock('speaking');
+      if (done.size >= 3 && FR.celebrate) FR.celebrate(1, 'Shadowing done', done.size + ' lines spoken');
       FR.save(true);
       el.innerHTML = `<div class="ex-wrap"><div class="card" style="text-align:center;padding:28px"><div class="eyebrow">${esc(opt.title)}</div><div class="sum-big">${done.size}</div><div class="dim">lines practised with recording or speech check</div><p>Shadow the whole text again tomorrow at a faster speed. Speaking improves with repetition, not with new material.</p></div>
         <div class="row"><button class="btn pri" data-a="again">${ICON.redo} Again</button><a class="btn" href="${opt.back || '#/practice'}">Back</a></div></div>`;
