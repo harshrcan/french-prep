@@ -7,7 +7,7 @@
 
   /* ---------- shell ---------- */
   const NAV = [['#/', 'Today', 'home'], ['#/lessons', 'Lessons', 'book'], ['#/practice', 'Practice', 'target'], ['#/cards', 'Cards', 'cards'], ['#/me', 'Me', 'user']];
-  const NAV_EXTRA = [['#/speak', 'Speaking topics', 'mic'], ['#/stories', 'Stories', 'read'], ['#/verbs', 'Verbs', 'verb'], ['#/write', 'Writing', 'pen'], ['#/maps', 'Concept maps', 'map']];
+  const NAV_EXTRA = [['#/dashboard', 'Dashboard', 'bolt'], ['#/words', '50 words a day', 'cards'], ['#/chat', 'AI chat partner', 'ear'], ['#/speak', 'Speaking topics', 'mic'], ['#/expressions', 'Native expressions', 'flag'], ['#/fiction', 'Fiction', 'read'], ['#/stories', 'Stories', 'read'], ['#/verbs', 'Verbs', 'verb'], ['#/write', 'Writing', 'pen'], ['#/maps', 'Concept maps', 'map']];
   function shell(active) {
     $('#tabs').innerHTML = NAV.map(([h, t, i]) => `<a href="${h}" class="${active === h ? 'on' : ''}">${ICON[i]}<span>${t}</span></a>`).join('');
     $('#nav').innerHTML = NAV.map(([h, t, i]) => `<a href="${h}" class="${active === h ? 'on' : ''}">${ICON[i]}${t}</a>`).join('') + '<div class="sep"></div>' + NAV_EXTRA.map(([h, t, i]) => `<a href="${h}" class="${active === h ? 'on' : ''}">${ICON[i]}${t}</a>`).join('');
@@ -15,7 +15,7 @@
   }
   function topRight() {
     const c = FR.cloud.get(), cs = FR.cloud.status(), sec = S().log[FR.todayKey()] || 0;
-    $('#top-right').innerHTML = `<span class="pill gold" id="pts" title="Points · rank: ${esc(FR.rank(S().pts || 0).name)}">✦ ${S().pts || 0}</span><span class="pill ${sec >= 10800 ? 'ok' : 'gold'}" title="Active study time today">${FR.fmtMin(sec)}<span class="hide-sm"> / 3h</span></span><a href="#/me" class="icon-btn" title="${c ? 'Cloud save: ' + esc(c.name) : 'Not signed in'}"><span class="sync-dot ${c ? (cs.err ? 'err' : 'on') : ''}"></span></a>`;
+    $('#top-right').innerHTML = `<span class="pill gold" id="pts" title="Points · rank: ${esc(FR.rank(S().pts || 0).name)}">✦ ${S().pts || 0}</span><span class="pill ${sec >= (S().target || 60) * 60 ? 'ok' : 'gold'}" title="Active study time today">${FR.fmtMin(sec)}<span class="hide-sm"> / ${(S().target || 60) < 60 ? (S().target || 60) + 'm' : (S().target || 60) / 60 + 'h'}</span></span><a href="#/me" class="icon-btn" title="${c ? 'Cloud save: ' + esc(c.name) : 'Not signed in'}"><span class="sync-dot ${c ? (cs.err ? 'err' : 'on') : ''}"></span></a>`;
     $('#side-foot').innerHTML = c ? `Signed in as <b>${esc(c.name)}</b><br>${cs.err ? '<span style="color:var(--bad)">sync issue</span>' : 'progress syncs to the cloud'}` : 'Progress saved on this device.<br><a href="#/me">Sign in to sync →</a>';
   }
   FR.onSync = topRight;
@@ -58,46 +58,54 @@
 
   /* ======================= TODAY ======================= */
   function blockLinks(k, d) {
-    const L = FR.lesson(d), sid = L.stories[0], w = WRITING.filter((x) => x.day <= d).pop();
+    const L = FR.lesson(d), sid = L.stories[0], w = WRITING.filter((x) => x.day <= d).pop(), sp = FR.speak(d);
+    const fic = (window.FICTION || []).filter((f) => f.day <= d).pop();
     const a = (h, t, pri) => `<a class="btn sm ${pri ? 'pri' : ''}" href="${h}">${t}</a>`;
     return {
-      grammar: [`Day ${d}: ${L.title}`, a(`#/lesson/${d}`, 'Learn', 1) + a(`#/lesson/${d}/map`, 'Concept map') + a(`#/lesson/${d}/practice`, 'Practice')],
-      vocab: [`Deck: ${FR.deck(L.deck).name} · verbs: ${L.verbs.slice(0, 4).join(', ')}…`, a(`#/cards/${L.deck}`, 'Flashcards', 1) + a(`#/drill?day=${d}`, 'Verb drill') + a('#/cards/all', 'All due cards')],
-      reading: [`Story: ${FR.story(sid).title}`, a(`#/story/${sid}`, 'Read', 1) + a(`#/story/${sid}/quiz`, 'Questions') + a(`#/seq/${sid}`, 'Order the story')],
-      listening: ['Listen without the text first, then dictation.', a(`#/story/${sid}/listen`, 'Listen', 1) + a(`#/dict?day=${d}`, 'Dictation')],
-      speaking: [`Topic: ${FR.speak(d) ? FR.speak(d).title : ''}. Answer 4+ questions aloud, or shadow 6+ lines.`, a(`#/lesson/${d}/speak`, 'Speaking topic', 1) + a(`#/cards/sp${d}`, 'Topic words') + a(`#/shadow/${sid}`, 'Shadow story')],
-      writing: [`Task: ${w.title}`, a(`#/write/${w.id}`, 'Write', 1) + a('#/quiz?mode=mistakes', `Mistakes (${S().mist.filter((id) => FR.EX[id]).length})`)]
+      grammar: [`Day ${d}: ${L.title}`, a(`#/lesson/${d}`, 'Learn', 1) + a(`#/lesson/${d}/practice`, 'Practice') + a(`#/lesson/${d}/map`, 'Map')],
+      words: [`Topic: ${sp ? sp.title : ''} · 50 words`, a(`#/words/${d}`, 'Learn the 50', 1) + a(`#/words/${d}/quiz`, 'Quick test')],
+      revise: [d > 1 ? `Same 50 words as yesterday (${FR.speak(d - 1) ? FR.speak(d - 1).title : ''})` : 'Starts tomorrow', d > 1 ? a(`#/words/${d - 1}/revise`, 'Revise', 1) + a(`#/words/${d - 1}/quiz`, 'Test') : ''],
+      speaking: [`${sp ? sp.title : ''}: answer 4 questions aloud`, a(`#/lesson/${d}/speak`, 'Speak', 1) + a(`#/shadow/${sid}`, 'Shadow')],
+      story: [`${FR.story(sid).title}${fic ? ' · or fiction: ' + fic.title : ''}`, a(`#/story/${sid}`, 'Read', 1) + a(`#/story/${sid}/listen`, 'Listen') + (fic ? a(`#/story/${fic.id}`, 'Fiction') : '')],
+      chat: ['Roleplay a real situation and get corrections', a('#/chat', 'Start a chat', 1)],
+      expr: ['Learn 5 expressions natives use', a('#/expressions', 'Expressions', 1) + a('#/expressions/quiz', 'Quiz')],
+      writing: [`Task: ${w.title}`, a(`#/write/${w.id}`, 'Write', 1)]
     }[k];
   }
   function pageToday() {
     setTop('Today'); const st = S(), raw = FR.rawDay(), d = FR.curDay(), L = FR.lesson(d), rec = FR.dayRec(d);
     const sec = st.log[FR.todayKey()] || 0, due = FR.dueReviews(), mist = st.mist.filter((id) => FR.EX[id]).length;
     const dueCards = FR.allDecks().reduce((a, dk) => a + FR.deckStats(dk).due, 0);
-    const startDate = new Date(st.start + 'T00:00:00');
+    const startDate = new Date(st.start + 'T00:00:00'), tgt = st.target || 60;
     let hero;
-    if (raw < 1) hero = `<div class="eyebrow">Starts ${startDate.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}</div><h1>Get ready</h1><p class="dim">Your 20-day plan has not started yet. Day 1 is shown below so you can preview it.</p>`;
-    else if (raw > 20) hero = `<div class="eyebrow">Program complete · day ${raw}</div><h1>Keep it alive</h1><p class="dim">Daily now: due cards, due lesson retests, one story (listen first), one writing task. Then start B1 topics.</p>`;
+    if (raw < 1) hero = `<div class="eyebrow">Starts ${startDate.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}</div><h1>Get ready</h1><p class="dim">Your plan has not started yet. Day 1 is shown below so you can preview it.</p>`;
+    else if (raw > 20) hero = `<div class="eyebrow">Program complete · day ${raw}</div><h1>Keep it alive</h1><p class="dim">Daily now: due cards, retests, one story, one chat. Then start B1 topics.</p>`;
     else hero = `<div class="eyebrow">Day ${d} of 20 · ${esc(L.lvl)} · ${esc(L.theme)}</div><h1>${esc(L.title)}</h1>`;
-    const blocks = FR.BLOCKS.map((b) => { const [desc, links] = blockLinks(b.k, d); const on = !!rec.blocks[b.k]; return `<div class="block"><button class="tick ${on ? 'on' : ''}" data-k="${b.k}" aria-label="Mark done">${ICON.check}</button><div style="flex:1;min-width:0"><div class="row between"><span class="bt">${b.t}</span><span class="bm">${b.m} min</span></div><div class="bd">${esc(desc)}</div><div class="row" style="gap:6px">${links}</div></div></div>`; }).join('');
-    const doneN = FR.BLOCKS.filter((b) => rec.blocks[b.k]).length;
-    const grid = LESSONS.map((l) => { const m = FR.mastery(l.day); const r = st.days[l.day]; const comp = r ? FR.BLOCKS.filter((b) => r.blocks[b.k]).length : 0; const cls = m >= 3 && comp >= 5 ? 'd3' : comp >= 3 || m >= 3 ? 'd2' : comp || m ? 'd1' : ''; return `<a href="#/lesson/${l.day}" class="${cls} ${l.day === d && raw >= 1 && raw <= 20 ? 'cur' : ''}" title="Day ${l.day}: ${esc(l.title)}">${l.day}</a>`; }).join('');
-    const ex = Object.values(st.ex); const c = ex.reduce((a, r) => a + r.c, 0), w = ex.reduce((a, r) => a + r.w, 0);
+    const plan = FR.planned(d), planKeys = plan.map((b) => b.k), doneSet = FR.doneKeys(rec);
+    const blockHtml = (b) => { const [desc, links] = blockLinks(b.k, d); const on = doneSet.includes(b.k); return `<div class="block"><button class="tick ${on ? 'on' : ''}" data-k="${b.k}" aria-label="Mark done">${ICON.check}</button><div style="flex:1;min-width:0"><div class="row between"><span class="bt">${b.t}${b.core ? '' : ''}</span><span class="bm">~${b.m} min</span></div><div class="bd">${esc(desc)}</div><div class="row" style="gap:6px">${links}</div></div></div>`; };
+    const bonus = FR.BLOCKS.filter((b) => !planKeys.includes(b.k) && !(b.k === 'revise' && d < 2));
+    const planDone = plan.filter((b) => doneSet.includes(b.k)).length, planMin = plan.reduce((x, b) => x + b.m, 0);
+    const topicsToday = FR.topicsOn(FR.todayKey());
+    const grid = LESSONS.map((l) => { const m = FR.mastery(l.day); const r = st.days[l.day]; const comp = r ? FR.doneKeys(r).length : 0; const cls = m >= 3 && comp >= 4 ? 'd3' : comp >= 2 || m >= 3 ? 'd2' : comp || m ? 'd1' : ''; return `<a href="#/lesson/${l.day}" class="${cls} ${l.day === d && raw >= 1 && raw <= 20 ? 'cur' : ''}" title="Day ${l.day}: ${esc(l.title)}">${l.day}</a>`; }).join('');
+    const exd = FR.exprOfDay();
     main.innerHTML = `<div class="hero">${hero}</div>
-      ${FR.charCard('prof', esc(FR.profTip(d)) + (doneN === 6 ? ' <b>Journée parfaite !</b>' : ''))}
+      ${FR.charCard('prof', esc(FR.profTip(d)) + (planDone === plan.length ? ' <b>Plan du jour terminé !</b>' : ''))}
       ${L.assess && raw >= 1 ? `<a class="tile today" href="#/mock/${L.assess}" style="margin-bottom:14px"><div class="k">Assessment day</div><div class="t">${esc(MOCKS[L.assess].title)}</div><div class="s">${esc(MOCKS[L.assess].desc)}${st.mocks[L.assess] ? ' · best ' + st.mocks[L.assess].best + '%' : ''}</div></a>` : ''}
-      <div class="card"><div class="row between"><h3 style="margin:0">Today's 3 hours</h3><span class="pill ${doneN === 6 ? 'ok' : ''}">${doneN}/6 blocks</span></div>
-        <div style="margin:12px 0 4px" class="row between"><span class="dim" style="font-size:13px">Active time today: <b style="color:var(--tx)">${FR.fmtMin(sec)}</b> of 3h</span><span class="dim" style="font-size:13px">${Math.min(100, Math.round(sec / 108))}%</span></div>
-        <div class="progress ${sec >= 10800 ? 'ok' : ''}"><i style="width:${Math.min(100, sec / 108)}%"></i></div>
-        <div style="margin-top:8px">${blocks}</div></div>
+      <div class="card"><div class="row between"><h3 style="margin:0">Today's plan</h3><span class="pill ${planDone === plan.length ? 'ok' : 'gold'}">${planDone}/${plan.length} topics</span></div>
+        <div class="row between" style="margin:10px 0 6px"><span class="dim" style="font-size:13px">Time I have today:</span><div class="seg" style="margin:0">${FR.TARGETS.map((m) => `<button data-tg="${m}" class="${tgt === m ? 'on' : ''}">${m < 60 ? m + 'm' : m / 60 + 'h'}</button>`).join('')}</div></div>
+        <div class="row between" style="margin:8px 0 4px"><span class="dim" style="font-size:13px">Active time <b style="color:var(--tx)">${FR.fmtMin(sec)}</b> · plan ~${planMin} min · <b style="color:var(--tx)">${topicsToday}</b> topic${topicsToday === 1 ? '' : 's'} finished today</span></div>
+        <div class="progress ${planDone === plan.length ? 'ok' : ''}"><i style="width:${Math.round((planDone / plan.length) * 100)}%"></i></div>
+        <div style="margin-top:6px">${plan.map(blockHtml).join('')}</div>
+        ${bonus.length ? `<details style="margin-top:8px"><summary class="dim" style="cursor:pointer">Bonus if you have extra time (${bonus.length})</summary>${bonus.map(blockHtml).join('')}</details>` : ''}</div>
+      ${exd ? `<div class="card tight"><div class="eyebrow">Expression of the day</div><div class="row between"><span class="fr" style="font-size:1.15rem">${esc(exd.fr)}</span>${FR.sayBtn(exd.fr)}</div><div class="dim" style="font-size:13.5px">${esc(exd.en)} · <i>${esc(exd.ex)}</i></div></div>` : ''}
       ${due.length || mist || dueCards ? `<div class="card"><h3>Reviews due</h3>
         ${due.map((l) => `<div class="list-row"><div class="grow"><b>Retest Day ${l.day}</b><div class="dim" style="font-size:13px">${esc(l.title)}</div></div><a class="btn sm pri" href="#/lesson/${l.day}/retest">Retest</a></div>`).join('')}
         ${dueCards ? `<div class="list-row"><div class="grow"><b>${dueCards} flashcards due</b></div><a class="btn sm" href="#/cards/all">Review</a></div>` : ''}
         ${mist ? `<div class="list-row"><div class="grow"><b>${mist} past mistakes</b><div class="dim" style="font-size:13px">Get each one right to clear it</div></div><a class="btn sm" href="#/quiz?mode=mistakes">Fix them</a></div>` : ''}</div>` : ''}
-      <div class="card"><div class="row between"><h3 style="margin:0">20-day map</h3><span class="dim" style="font-size:12px">tap a day</span></div><div class="days" style="margin-top:12px">${grid}</div>
-        <div class="row" style="margin-top:12px;gap:14px;font-size:12px;color:var(--tx3)"><span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#1b1a12"></i> started</span><span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#2b2614"></i> practised</span><span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#12251a"></i> solid</span></div></div>
-      ${rankCard()}
-      <div class="grid g3"><div class="card tight stat"><b>${FR.streak()}</b><span>day streak (30m+)</span></div><div class="card tight stat"><b>${FR.fmtMin(FR.totalSec())}</b><span>total active time</span></div><div class="card tight stat"><b>${c + w ? Math.round((c / (c + w)) * 100) : 0}%</b><span>accuracy · ${c + w} answers</span></div></div>`;
-    $$('.tick', main).forEach((t) => (t.onclick = () => { const r = FR.dayRec(d); r.blocks[t.dataset.k] = !r.blocks[t.dataset.k]; FR.save(); pageToday(); }));
+      <div class="card"><div class="row between"><h3 style="margin:0">20-day map</h3><a class="btn sm ghost" href="#/dashboard">Dashboard</a></div><div class="days" style="margin-top:12px">${grid}</div></div>
+      ${rankCard()}`;
+    $$('.tick', main).forEach((t) => (t.onclick = () => { const k = t.dataset.k; if (!doneSet.includes(k)) FR.markBlock(k); else { const r = FR.dayRec(d); delete r.blocks[k]; Object.keys(r.blocks).forEach((x) => { if (FR.blockKey(x) === k) delete r.blocks[x]; }); const tk = FR.todayKey(); st.topics[tk] = (st.topics[tk] || []).filter((x) => x !== k); FR.save(); } pageToday(); }));
+    $$('[data-tg]', main).forEach((b) => (b.onclick = () => { st.target = +b.dataset.tg; FR.save(); pageToday(); }));
   }
 
   /* ======================= LESSONS ======================= */
@@ -227,6 +235,13 @@
     const t = (h, k, title, s) => `<a class="tile" href="${h}"><div class="k">${k}</div><div class="t">${title}</div><div class="s">${s}</div></a>`;
     main.innerHTML = `<div class="hero"><div class="char-corner">${FR.CHAR.cat}</div><h1>Practice</h1><p class="dim">Everything shows the answer and the rule after you try.</p></div>
       <div class="row" style="margin-bottom:14px"><span class="dim" style="font-size:13px">Quiz scope:</span><div class="seg" style="margin:0;flex:0 0 auto"><button data-sc="today" class="${scope === 'today' ? 'on' : ''}">Days 1–${d}</button><button data-sc="all" class="${scope === 'all' ? 'on' : ''}">All 20 days</button></div></div>
+      <h3>Daily</h3><div class="grid g2">
+        ${t('#/words/' + d, 'day ' + d, '50 words a day', 'Today\'s topic words, plus yesterday\'s for revision.')}
+        ${t('#/chat', 'roleplay', 'AI chat partner', 'Talk through real situations and get corrections.')}
+        ${t('#/expressions', FR.EXPR.reduce((a, c) => a + c.items.length, 0) + ' expressions', 'Native expressions', 'Reactions, fillers, idioms, Québec French.')}
+        ${t('#/fiction', (window.FICTION || []).length + ' stories', 'Fiction', 'Original short stories, A2 to B1.')}
+        ${t('#/dashboard', 'progress', 'Dashboard', 'Topics per day, minutes, mastery, words learned.')}
+      </div>
       <h3>Quizzes</h3><div class="grid g2">
         ${t('#/quiz?mode=mixed', '20 questions', 'Mixed quiz', 'All exercise types, weighted toward what you get wrong.')}
         ${t('#/quiz?mode=mistakes', mist + ' saved', 'Mistakes review', 'Every question you missed. Clear them by getting them right.')}
@@ -266,7 +281,7 @@
     else if (mode === 'mixed') { items = FR.pickWeighted(pool, 20); title = 'Mixed quiz'; }
     else { const n = { mcq: 15, fill: 15, order: 12, write: 10 }[mode] || 15; items = FR.pickWeighted(pool.filter((e) => e.t === mode), n); title = { mcq: 'MCQ sprint', fill: 'Fill-ups', order: 'Sentence formation', write: 'Translation' }[mode]; }
     setTop(title, '#/practice');
-    FR.runSet({ el: main, items: shuffle(items), title, mode, onResult: (r) => { if (mode === 'mistakes' && r.n >= 5) FR.markBlock('writing'); if (r.n >= 10) FR.markBlock('grammar'); }, onQuit: () => { location.hash = '#/practice'; } });
+    FR.runSet({ el: main, items: shuffle(items), title, mode, onResult: (r) => { if (r.n >= 10) FR.markBlock('grammar'); }, onQuit: () => { location.hash = '#/practice'; } });
   }
 
   /* ======================= VERBS ======================= */
@@ -318,14 +333,14 @@
       const v = vs[Math.floor(Math.random() * vs.length)], t = Math.random() < 0.4 ? latest : tenses[Math.floor(Math.random() * tenses.length)], k = Math.floor(Math.random() * 6);
       const it = FR.conjItem(v, t, k); if (it && !items.find((x) => x.id === it.id)) items.push(it);
     }
-    FR.runSet({ el: main, items, title, mode: 'drill', onResult: (r) => { const st = S(); st.drill.n += r.n; st.drill.c += r.res.filter((x) => x.score >= 1).length; if (r.n >= 10) FR.markBlock('vocab'); FR.save(); }, onQuit: () => { location.hash = '#/drill'; } });
+    FR.runSet({ el: main, items, title, mode: 'drill', onResult: (r) => { const st = S(); st.drill.n += r.n; st.drill.c += r.res.filter((x) => x.score >= 1).length; if (r.n >= 10) FR.markBlock('grammar'); FR.save(); }, onQuit: () => { location.hash = '#/drill'; } });
   }
 
   /* ======================= STORIES ======================= */
   function pageStories() {
     setTop('Stories', '#/practice');
     main.innerHTML = `<div class="hero"><div class="char-corner">${FR.CHAR.ghost}</div><h1>Reading library</h1><p class="dim">Graded from A1 to B1. Each story has audio, line-by-line translation, a glossary, questions, a listening mode, shadowing and dictation.</p></div>
-      <div class="grid g2">${STORIES.map((s) => { const r = S().st[s.id] || {}; return `<a class="tile ${r.quiz >= 80 ? 'done' : ''}" href="#/story/${s.id}"><div class="row between"><span class="k">Day ${s.day} · ${s.lvl}</span>${r.quiz != null ? `<span class="pill ${r.quiz >= 80 ? 'ok' : ''}">${r.quiz}%</span>` : ''}</div><div class="t">${esc(s.title)}</div><div class="s">${esc(s.focus)}</div></a>`; }).join('')}</div>`;
+      <div class="grid g2">${STORIES.filter((s) => !s.fiction).map((s) => { const r = S().st[s.id] || {}; return `<a class="tile ${r.quiz >= 80 ? 'done' : ''}" href="#/story/${s.id}"><div class="row between"><span class="k">Day ${s.day} · ${s.lvl}</span>${r.quiz != null ? `<span class="pill ${r.quiz >= 80 ? 'ok' : ''}">${r.quiz}%</span>` : ''}</div><div class="t">${esc(s.title)}</div><div class="s">${esc(s.focus)}</div></a>`; }).join('')}</div>`;
   }
   function pageStory(id, mode) {
     const s = FR.story(id); if (!s) return notFound();
@@ -338,7 +353,7 @@
         onQuit: () => { location.hash = '#/story/' + id + (mode === 'lquiz' ? '/listen' : ''); } });
     }
     const listen = mode === 'listen';
-    setTop(s.title, listen ? '#/story/' + id : '#/stories');
+    setTop(s.title, listen ? '#/story/' + id : s.fiction ? '#/fiction' : '#/stories');
     let showEn = false, showTx = !listen, rate = st.rate || 0.9;
     const lines = s.lines.map((l) => l[0]);
     function draw() {
@@ -494,6 +509,170 @@
     };
   }
 
+  /* ======================= 50 WORDS A DAY ======================= */
+  function wordsRec(d) { const st = S(); st.words = st.words || {}; return (st.words[d] = st.words[d] || {}); }
+  function wordsCredit(d, kind) { const cur = FR.curDay(); if (+d === cur && kind !== 'revise') FR.markBlock('words'); else if (+d < cur) FR.markBlock('revise'); }
+  function pageWords(d, mode) {
+    d = +d; const t = FR.speak(d), dk = FR.deck('sp' + d); if (!t || !dk) return notFound();
+    const rec = wordsRec(d), cur = FR.curDay();
+    if (mode === 'learn' || mode === 'revise') {
+      setTop((mode === 'revise' ? 'Revise · ' : '50 words · ') + t.title, '#/words/' + d);
+      return FR.runCards({ el: main, deck: dk, cram: true, onDone: (r) => { if (r.unique >= dk.cards.length) { rec[mode === 'revise' ? 'revised' : 'learned'] = Date.now(); FR.save(); wordsCredit(d, mode); } } });
+    }
+    if (mode === 'quiz') {
+      setTop('Word test · ' + t.title, '#/words/' + d);
+      const cards = dk.cards, pick = sample(cards, Math.min(20, cards.length));
+      const items = pick.map((c, i) => { const toEn = i % 2 === 0; const others = sample(cards.filter((x) => x.id !== c.id), 3); return { id: 'W-' + c.id + (toEn ? '-e' : '-f'), t: 'mcq', q: toEn ? esc(c.fr) : esc(c.en), opts: [toEn ? c.en : c.fr].concat(others.map((o) => (toEn ? o.en : o.fr))), a: toEn ? c.en : c.fr, why: `<b>${esc(c.fr)}</b> = ${esc(c.en)}`, label: toEn ? 'What does it mean?' : 'Say it in French', src: { words: d } }; });
+      return FR.runSet({ el: main, items, title: 'Word test · Day ' + d, mode: 'words', onResult: (r) => { if (r.quit) return; rec.test = Math.max(rec.test || 0, r.pct); if (r.pct >= 70) wordsCredit(d, d < cur ? 'revise' : 'learn'); FR.save(true); }, onQuit: () => { location.hash = '#/words/' + d; } });
+    }
+    setTop('50 words · Day ' + d, '#/words');
+    const st = FR.deckStats(dk);
+    main.innerHTML = `<div class="eyebrow">Day ${d} · ${esc(t.lvl)} · ${d === cur ? 'today\'s words' : d === cur - 1 ? 'revise today' : 'words'}</div><h1>${esc(t.title)}</h1>
+      <div class="card"><div class="row between"><div class="dim" style="font-size:13.5px">${dk.cards.length} words · learned ${st.learned}/${st.total}${rec.test ? ' · best test ' + rec.test + '%' : ''}${rec.learned ? ' · studied ✓' : ''}${rec.revised ? ' · revised ✓' : ''}</div></div>
+        <div class="row" style="margin-top:10px"><a class="btn pri" href="#/words/${d}/${d < cur ? 'revise' : 'learn'}">${ICON.cards} ${d < cur ? 'Revise all 50' : 'Study all 50'}</a><a class="btn" href="#/words/${d}/quiz">Quick test (20)</a><button class="btn ghost" id="playall">${ICON.play} Listen to all</button></div>
+        <p class="dim" style="font-size:12.5px;margin:10px 0 0">Go through every card once (or score 70%+ on the test) to finish this topic. Tomorrow these same 50 come back for revision.</p></div>
+      <div class="card tight">${dk.cards.map((c, i) => `<div class="list-row"><span class="tag">${i + 1}</span><div class="grow"><span class="fr">${esc(c.fr)}</span><div class="dim" style="font-size:13px">${esc(c.en)}</div></div>${FR.sayBtn(c.fr.replace(/\(.*?\)/g, ''))}</div>`).join('')}</div>`;
+    $('#playall').onclick = () => FR.playLines(dk.cards.map((c) => c.fr.replace(/\(.*?\)/g, '')), { gap: 700 });
+  }
+  function pageWordsList() {
+    setTop('50 words a day', '#/practice'); const cur = FR.curDay();
+    main.innerHTML = `<div class="hero"><div class="char-corner">${FR.CHAR.cat}</div><h1>50 words a day</h1><p class="dim">One topic per day, matched to the day's speaking topic. Learn today's 50, and revise yesterday's 50.</p></div>
+      <div class="grid g2">${FR.SPEAK.map((t) => { const r = (S().words || {})[t.day] || {}, stt = FR.deckStats(FR.deck('sp' + t.day)); return `<a class="tile ${t.day === cur ? 'today' : ''} ${r.learned && r.revised ? 'done' : ''}" href="#/words/${t.day}"><div class="row between"><span class="k">Day ${t.day}${t.day === cur ? ' · today' : t.day === cur - 1 ? ' · revise' : ''}</span><span class="pill ${r.revised ? 'ok' : ''}">${stt.learned}/${stt.total}</span></div><div class="t">${esc(t.title)}</div><div class="s">${r.learned ? 'studied ✓ ' : ''}${r.revised ? 'revised ✓' : ''}${!r.learned && !r.revised ? '50 words' : ''}</div></a>`; }).join('')}</div>`;
+  }
+
+  /* ======================= EXPRESSIONS ======================= */
+  const REG = { std: 'everyday', fam: 'casual', qc: 'Québec', idiom: 'idiom' };
+  function pageExpressions(mode) {
+    if (mode === 'quiz') {
+      setTop('Expressions quiz', '#/expressions');
+      const all = FR.EXPR.flatMap((c) => c.items), pick = sample(all, 12);
+      const items = pick.map((it, i) => { const toEn = i % 2 === 1; const others = sample(all.filter((x) => x.id !== it.id), 3); return { id: 'E-' + it.id + (toEn ? '-e' : '-f'), t: 'mcq', q: toEn ? esc(it.fr) : esc(it.en), opts: [toEn ? it.en : it.fr].concat(others.map((o) => (toEn ? o.en : o.fr))), a: toEn ? it.en : it.fr, why: `<b>${esc(it.fr)}</b> · ${esc(it.en)}<br><i>${esc(it.ex)}</i> (${REG[it.reg] || it.reg})`, label: toEn ? 'What does a native mean?' : 'Which expression fits?', src: { expr: true } }; });
+      return FR.runSet({ el: main, items, title: 'Native expressions', mode: 'expr', onResult: (r) => { if (r.quit && r.n < 8) return; const st = S(); st.expr = st.expr || {}; st.expr.quiz = Math.max(st.expr.quiz || 0, r.pct); FR.markBlock('expr'); FR.save(true); }, onQuit: () => { location.hash = '#/expressions'; } });
+    }
+    setTop('Native expressions', '#/practice');
+    main.innerHTML = `<div class="hero"><div class="char-corner">${FR.CHAR.ghost}</div><h1>Native expressions</h1><p class="dim">What French speakers actually say: reactions, fillers, feelings, idioms and Québec French. Tap 🔊 to hear each one.</p></div>
+      <div class="row" style="margin-bottom:14px"><a class="btn pri" href="#/expressions/quiz">${ICON.bolt} Quiz me (12)</a></div>
+      ${FR.EXPR.map((c, ci) => `<details class="card tight" ${ci === 0 ? 'open' : ''}><summary><b>${esc(c.title)}</b> <span class="dim">(${c.items.length})</span></summary>
+        <div class="row" style="margin:8px 0"><a class="btn sm" href="#/cards/ex-${c.id}?cram=1">${ICON.cards} Flashcards</a></div>
+        ${c.items.map((it) => `<div class="list-row" style="align-items:flex-start"><div class="grow"><div class="row" style="gap:8px"><span class="fr" style="font-size:1.08rem">${esc(it.fr)}</span><span class="tag">${esc(REG[it.reg] || it.reg)}</span></div><div style="font-size:14px">${esc(it.en)}</div><div class="dim fr" style="font-size:14px;font-style:italic">${esc(it.ex)} ${FR.sayBtn(it.ex)}</div></div>${FR.sayBtn(it.fr)}</div>`).join('')}</details>`).join('')}`;
+    $$('details', main).forEach((dd) => dd.addEventListener('toggle', () => { if (dd.open) { const st = S(); st.expr = st.expr || {}; st.expr.opened = (st.expr.opened || 0) + 1; if (st.expr.opened >= 3) FR.markBlock('expr'); FR.save(); } }));
+  }
+
+  /* ======================= FICTION ======================= */
+  function pageFiction() {
+    setTop('Fiction', '#/practice'); const cur = FR.curDay();
+    main.innerHTML = `<div class="hero"><div class="char-corner">${FR.CHAR.prof}</div><h1>Fiction</h1><p class="dim">Original short stories to read for pleasure, A2 to B1. Each has audio, line-by-line translation, a glossary, questions, shadowing and dictation.</p></div>
+      <div class="grid g2">${(window.FICTION || []).map((f) => { const r = S().st[f.id] || {}; return `<a class="tile ${r.quiz >= 80 ? 'done' : ''}" href="#/story/${f.id}"><div class="row between"><span class="k">${esc(f.genre)} · ${f.lvl}${f.day > cur ? ' · from day ' + f.day : ''}</span>${r.quiz != null ? `<span class="pill ${r.quiz >= 80 ? 'ok' : ''}">${r.quiz}%</span>` : ''}</div><div class="t">${esc(f.title)}</div><div class="s">${esc(f.focus)}</div></a>`; }).join('')}</div>`;
+  }
+
+  /* ======================= DASHBOARD ======================= */
+  function bars(items, opt = {}) {
+    const max = Math.max(opt.min || 1, ...items.map((x) => x.v)), H = 120, W = Math.max(280, items.length * 26), bw = W / items.length;
+    return `<div style="overflow-x:auto"><svg viewBox="0 0 ${W} ${H + 34}" style="width:100%;min-width:${Math.min(W, 520)}px;height:auto;display:block">
+      ${items.map((x, i) => { const h = Math.round((x.v / max) * H); return `<g><rect x="${i * bw + bw * 0.18}" y="${H - h + 6}" width="${bw * 0.64}" height="${Math.max(h, x.v ? 2 : 0)}" rx="3" fill="${x.hl ? 'var(--gold)' : 'var(--gold2)'}" opacity="${x.hl ? 1 : 0.75}"/>${x.v ? `<text x="${i * bw + bw / 2}" y="${H - h + 2}" text-anchor="middle" font-size="10" fill="var(--tx2)">${x.t || x.v}</text>` : ''}<text x="${i * bw + bw / 2}" y="${H + 22}" text-anchor="middle" font-size="10" fill="var(--tx3)">${esc(x.l)}</text></g>`; }).join('')}
+      <line x1="0" x2="${W}" y1="${H + 6}" y2="${H + 6}" stroke="var(--line2)"/></svg></div>`;
+  }
+  function pageDashboard() {
+    setTop('Dashboard', '#/'); const st = S(), days = [];
+    for (let i = 13; i >= 0; i--) { const dt = new Date(); dt.setDate(dt.getDate() - i); days.push(dt); }
+    const key = (dt) => FR.todayKey(dt), lab = (dt) => dt.toLocaleDateString(undefined, { day: 'numeric' }) + (dt.getDate() === 1 || days.indexOf(dt) === 0 ? ' ' + dt.toLocaleDateString(undefined, { month: 'short' }) : '');
+    const topicsSeries = days.map((dt) => ({ v: (st.topics[key(dt)] || []).length, l: lab(dt), hl: key(dt) === FR.todayKey() }));
+    const minSeries = days.map((dt) => { const m = Math.round((st.log[key(dt)] || 0) / 60); return { v: m, l: lab(dt), hl: key(dt) === FR.todayKey() }; });
+    const totalTopics = Object.values(st.topics || {}).reduce((a, x) => a + x.length, 0);
+    const ex = Object.values(st.ex); const c = ex.reduce((a, r) => a + r.c, 0), w = ex.reduce((a, r) => a + r.w, 0);
+    const spDecks = Object.values(FR.SPEAK_DECKS), learnedWords = spDecks.reduce((a, d) => a + FR.deckStats(d).learned, 0);
+    const mastery = [0, 0, 0, 0, 0]; LESSONS.forEach((L) => mastery[FR.mastery(L.day)]++);
+    const storiesRead = STORIES.filter((s) => !s.fiction && st.st[s.id] && (st.st[s.id].quiz != null || st.st[s.id].read)).length, ficRead = (window.FICTION || []).filter((f) => st.st[f.id] && (st.st[f.id].quiz != null || st.st[f.id].read)).length;
+    const spoke = Object.values(st.sp || {}).reduce((a, x) => a + (x.q || 0), 0), chats = Object.values(st.chat || {}).reduce((a, x) => a + (x.turns || 0), 0);
+    const tile = (v, l) => `<div class="card tight stat"><b>${v}</b><span>${l}</span></div>`;
+    main.innerHTML = `<div class="hero"><div class="char-corner">${FR.CHAR.student}</div><h1>Dashboard</h1><p class="dim">Progress is counted in topics finished per day, not hours.</p></div>
+      <div class="grid g3">${tile(FR.topicsOn(FR.todayKey()), 'topics today')}${tile(totalTopics, 'topics finished, all time')}${tile(FR.streak(), 'day streak')}${tile(learnedWords + ' / ' + spDecks.length * 50, 'topic words learned')}${tile(c + w ? Math.round((c / (c + w)) * 100) + '%' : '–', 'accuracy · ' + (c + w) + ' answers')}${tile(FR.fmtMin(FR.totalSec()), 'active time')}</div>
+      <div class="card"><h3 style="margin-top:0">Topics finished per day</h3>${bars(topicsSeries, { min: 4 })}</div>
+      <div class="card"><h3 style="margin-top:0">Active minutes per day</h3>${bars(minSeries, { min: 30 })}<p class="dim" style="font-size:12.5px;margin-bottom:0">Daily target: ${st.target || 60} min. Counted only while you are actively using the app.</p></div>
+      <div class="card"><h3 style="margin-top:0">Lesson mastery</h3>
+        <div class="grid g3" style="margin-bottom:10px">${FR.MASTERY.map((m, i) => `<div class="stat"><b>${mastery[i]}</b><span>${m}</span></div>`).join('')}</div>
+        ${LESSONS.map((L) => { const r = st.les[L.day] || {}; const b = r.best || 0; return `<a class="row" href="#/lesson/${L.day}/practice" style="gap:10px;margin:6px 0;color:var(--tx);flex-wrap:nowrap"><span class="tag" style="flex:none">D${L.day}</span><div class="progress ${b >= 80 ? 'ok' : ''}" style="flex:1"><i style="width:${b}%"></i></div><span class="dim" style="font-size:12px;width:36px;text-align:right">${b ? b + '%' : '–'}</span>${FR.masteryDots(FR.mastery(L.day))}</a>`; }).join('')}</div>
+      <div class="grid g3">${tile(spoke, 'speaking answers recorded')}${tile(chats, 'chat turns with AI partner')}${tile(storiesRead + ' / ' + STORIES.filter((s) => !s.fiction).length, 'stories read')}${tile(ficRead + ' / ' + (window.FICTION || []).length, 'fiction read')}${tile(Object.keys(st.wr).length, 'texts written')}${tile(Object.entries(st.mocks).map(([k, m]) => m.best + '%').join(' · ') || '–', 'test scores')}</div>`;
+  }
+
+  /* ======================= AI CHAT PARTNER ======================= */
+  const CHATS = [
+    ['cafe', 'Au café', 'Order food and drinks, ask prices, pay.', 1],
+    ['appart', 'Visiter un appartement', 'Ask a landlord about rent, heating, the lease.', 4],
+    ['ami', 'Café avec un ami', 'Talk about your weekend and experiences (past tenses).', 9],
+    ['medecin', 'Chez le médecin', 'Describe symptoms, since when, where it hurts.', 7],
+    ['plainte', 'Retour en magasin', 'Return a faulty product politely.', 9],
+    ['voyage', 'Planifier un voyage', 'Plan next summer\'s trip (future tenses).', 8],
+    ['entretien', 'Entretien d\'embauche', 'Job interview for an IT support role.', 11],
+    ['tcf', 'TCF Canada · tâche 2', 'Exam-style interaction: you ask the questions.', 12],
+    ['libre', 'Conversation libre', 'Chat freely about your life and opinions.', 1]
+  ];
+  const CHAT_URL = 'https://cvgzypgaabjwunrfzmlr.supabase.co/functions/v1/fr-chat';
+  const SRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  function pageChat(id) {
+    const st = S(); st.chat = st.chat || {}; const cur = FR.curDay(), cl = FR.cloud.get();
+    if (!id) {
+      setTop('AI chat partner', '#/practice');
+      main.innerHTML = `<div class="hero"><div class="char-corner">${FR.CHAR.student}</div><h1>AI chat partner</h1><p class="dim">Roleplay real situations in French. Your partner stays in character, speaks at your level (day ${cur}), and corrects your mistakes after each message.</p></div>
+        ${cl ? '' : `<div class="card"><b>Sign in to use the chat.</b><p class="dim" style="margin-bottom:8px">The chat runs through your cloud account so nobody else can use it.</p><a class="btn pri sm" href="#/me">Sign in</a></div>`}
+        <div class="grid g2">${CHATS.map(([k, t, d, from]) => { const r = st.chat[k]; return `<a class="tile ${from <= cur ? '' : ''}" href="#/chat/${k}"><div class="row between"><span class="k">${from > cur ? 'best from day ' + from : 'ready'}</span>${r && r.turns ? `<span class="pill">${r.turns} turns</span>` : ''}</div><div class="t">${esc(t)}</div><div class="s">${esc(d)}</div></a>`; }).join('')}</div>`;
+      return;
+    }
+    const sc = CHATS.find((c) => c[0] === id); if (!sc) return notFound();
+    setTop(sc[1], '#/chat');
+    const rec = (st.chat[id] = st.chat[id] || { msgs: [], turns: 0 });
+    let msgs = (rec.msgs || []).slice(-16), busy = false, showEn = false, sessionTurns = 0;
+    function save() { rec.msgs = msgs.slice(-16).map((m) => ({ role: m.role, content: m.content, en: m.en, corr: m.corr, sug: m.sug })); rec.at = Date.now(); FR.save(); }
+    function bubble(m, i) {
+      if (m.role === 'assistant') return `<div class="chat-row ai"><div class="chat-b ai"><div class="fr">${esc(m.content)} ${FR.sayBtn(m.content)}</div>${showEn && m.en ? `<div class="dim" style="font-size:13px;margin-top:4px">${esc(m.en)}</div>` : ''}</div></div>`;
+      const corr = (m.corr || []).length ? `<div class="chat-corr">${m.corr.map((c) => `<div><span style="color:var(--bad);text-decoration:line-through">${esc(c.wrong)}</span> → <b class="fr" style="color:var(--ok)">${esc(c.right)}</b> ${FR.sayBtn(c.right)}<div class="dim" style="font-size:12.5px">${esc(c.why)}</div></div>`).join('')}</div>` : (m.checked ? '<div class="chat-corr ok">✓ No errors found</div>' : '');
+      return `<div class="chat-row me"><div class="chat-b me">${esc(m.content)}</div>${corr}</div>`;
+    }
+    function draw() {
+      const last = [...msgs].reverse().find((m) => m.role === 'assistant');
+      main.innerHTML = `<div class="chat-wrap"><div class="row between" style="margin-bottom:8px"><span class="dim" style="font-size:13px">${esc(sc[2])} · level: day ${cur}</span><div class="row" style="gap:6px"><button class="btn sm ghost" data-a="en">${showEn ? 'Hide' : 'Show'} English</button><button class="btn sm ghost" data-a="reset">New chat</button></div></div>
+        <div id="log" class="chat-log">${msgs.length ? msgs.map(bubble).join('') : FR.charCard('student', 'Écris ton premier message en français, ou appuie sur « Commencer » et ton partenaire ouvre la conversation.')}</div>
+        ${last && last.sug ? `<div class="dim" style="font-size:13px;margin:6px 0">Idea: <button class="btn sm ghost" data-a="sug" style="font-family:var(--serif)">${esc(last.sug)}</button></div>` : ''}
+        <div class="chat-input"><textarea id="msg" rows="2" placeholder="${msgs.length ? 'Réponds en français…' : 'Bonjour ! …'}" spellcheck="false"></textarea>
+          <div class="row" style="gap:6px;margin-top:6px">${SRec ? `<button class="btn sm" data-a="mic">${ICON.mic} Speak</button>` : ''}<span class="grow"></span>${msgs.length ? '' : '<button class="btn sm" data-a="start">Commencer</button>'}<button class="btn sm pri" data-a="send">Send</button></div>${FR.accBar()}</div>
+        <div id="cerr"></div>
+        ${sessionTurns >= 3 ? `<button class="btn ghost block" data-a="review" style="margin-top:10px">Review my corrections</button>` : ''}</div>`;
+      FR.bindAcc(main);
+      const log = $('#log'); log.scrollTop = log.scrollHeight;
+      const q = (a) => main.querySelector(`[data-a=${a}]`);
+      q('send').onclick = () => send($('#msg').value);
+      $('#msg').onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send($('#msg').value); } };
+      q('en').onclick = () => { showEn = !showEn; draw(); };
+      q('reset').onclick = () => { if (msgs.length && !confirm('Start a new conversation? This one will be cleared.')) return; msgs = []; save(); draw(); };
+      if (q('start')) q('start').onclick = () => send('', true);
+      if (q('sug')) q('sug').onclick = () => { $('#msg').value = last.sug; $('#msg').focus(); };
+      if (q('mic')) q('mic').onclick = () => { const r = new SRec(); r.lang = 'fr-FR'; r.interimResults = false; q('mic').innerHTML = '<span class="rec-dot"></span> Listening'; r.onresult = (e) => { $('#msg').value = ($('#msg').value + ' ' + e.results[0][0].transcript).trim(); }; r.onend = () => { const b = q('mic'); if (b) b.innerHTML = ICON.mic + ' Speak'; }; try { r.start(); } catch (e) { /* busy */ } };
+      if (q('review')) q('review').onclick = review;
+    }
+    async function send(text, opening) {
+      text = (text || '').trim(); if (busy || (!text && !opening)) return;
+      if (!cl) { $('#cerr').innerHTML = '<div class="feedback bad">Sign in under <a href="#/me">Me</a> to use the chat.</div>'; return; }
+      busy = true;
+      if (text) { msgs.push({ role: 'user', content: text }); sessionTurns++; rec.turns = (rec.turns || 0) + 1; }
+      draw(); $('#log').insertAdjacentHTML('beforeend', '<div class="chat-row ai"><div class="chat-b ai dim">…</div></div>'); $('#log').scrollTop = 1e9;
+      try {
+        const r = await fetch(CHAT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: cl.token, scenario: id, day: cur, messages: msgs.map((m) => ({ role: m.role, content: m.content })) }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.ok) throw new Error(j.message || 'The chat could not answer (' + r.status + ').');
+        const lastUser = [...msgs].reverse().find((m) => m.role === 'user'); if (text && lastUser) { lastUser.corr = j.corrections || []; lastUser.checked = true; }
+        msgs.push({ role: 'assistant', content: j.reply, en: j.en, sug: j.suggestion });
+        save(); busy = false; draw(); FR.tts.say(j.reply);
+        if (sessionTurns >= 6) FR.markBlock('chat');
+      } catch (e) { busy = false; if (text) { /* keep the message so it can be resent */ } draw(); $('#cerr').innerHTML = `<div class="feedback bad">${esc(e.message)}</div>`; }
+    }
+    function review() {
+      const all = msgs.filter((m) => m.role === 'user' && (m.corr || []).length);
+      FR.modal(`<h3>Corrections from this chat</h3>${all.length ? all.map((m) => m.corr.map((c) => `<div class="mistake"><div style="color:var(--bad)">${esc(c.wrong)}</div><div class="fr" style="color:var(--ok)">${esc(c.right)}</div><div class="dim" style="font-size:13px">${esc(c.why)}</div></div>`).join('')).join('') : '<p>No errors found so far. Très bien !</p>'}<button class="btn" onclick="FR.closeModal()">Close</button>`);
+      if (sessionTurns >= 6) FR.markBlock('chat');
+    }
+    draw();
+  }
+
   /* ======================= MAPS ======================= */
   function pageMaps() {
     setTop('Concept maps', '#/practice');
@@ -603,6 +782,12 @@
     [/^\/mock\/(\w+)$/, '#/practice', (m) => pageMock(m[1])],
     [/^\/maps$/, '#/maps', () => pageMaps()],
     [/^\/speak$/, '#/practice', () => pageSpeakList()],
+    [/^\/words$/, '#/words', () => pageWordsList()],
+    [/^\/words\/(\d+)(?:\/(\w+))?$/, '#/words', (m) => pageWords(m[1], m[2])],
+    [/^\/expressions(?:\/(\w+))?$/, '#/expressions', (m) => pageExpressions(m[1])],
+    [/^\/fiction$/, '#/fiction', () => pageFiction()],
+    [/^\/dashboard$/, '#/dashboard', () => pageDashboard()],
+    [/^\/chat(?:\/(\w+))?$/, '#/chat', (m) => pageChat(m[1])],
     [/^\/me$/, '#/me', () => pageMe()]
   ];
   function route() {

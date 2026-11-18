@@ -11,6 +11,12 @@ A 20-day, 3-hours-a-day French program as a static web app. No build step.
 - 3 assessments (day 7, day 11, final A2 mock) with a gap report
 - Daily 3-hour plan, active-time tracking, mastery levels with 1/3/7/14-day retests
 
+## Daily flow (v6)
+- Flexible plan: pick 30m / 45m / 1h / 1.5h / 2h. Core topics (grammar, today's 50 words, revise yesterday's 50, speaking) always appear, shortened on light days; story, AI chat, expressions and writing are added when there is time.
+- Progress is counted in topics finished per date (`topics`), shown on Today and the Dashboard.
+- 50 words a day: the day's speaking-topic deck (vocab + verbs + `words50.js`), revised the next day.
+- AI chat partner: Supabase edge function `fr-chat` (source in `supabase/functions/fr-chat`). Needs secrets `ANTHROPIC_API_KEY` and `CHAT_USERS` (app usernames allowed, comma-separated); optional `CHAT_MODEL`. 150 messages/day per user.
+
 ## Saving
 Progress saves in the browser (`fr-prep-v1`). Optional cloud save uses the same name + password pattern as Ctrl+Alt+Harsh: Supabase tables `fr_players` / `fr_sessions` (RLS on, no policies) reached only through the `fr_register`, `fr_login`, `fr_load`, `fr_save`, `fr_logout` functions. The key in `js/core.js` is a publishable key.
 

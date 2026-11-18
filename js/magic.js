@@ -100,12 +100,13 @@
   FR.record = (ex, score) => { rec(ex, score); if (score >= 1) FR.addPts(2); else if (score > 0) FR.addPts(1); };
   const mb = FR.markBlock;
   FR.markBlock = (k) => {
+    k = FR.blockKey(k);
     const r = FR.dayRec(FR.curDay()); const was = !!r.blocks[k]; mb(k);
     if (!was && r.blocks[k]) {
       FR.addPts(15);
-      const all = FR.BLOCKS.every((b) => r.blocks[b.k]);
-      if (all) { FR.addPts(50); setTimeout(() => FR.celebrate(3, 'Day ' + FR.curDay() + ' complete', 'All six blocks done. +50 points'), 400); }
-      else setTimeout(() => FR.celebrate(2, 'Block complete', esc(FR.BLOCKS.find((b) => b.k === k).t) + ' · +15 points'), 200);
+      const plan = FR.planned(), all = plan.every((b) => r.blocks[b.k]), inPlan = plan.some((b) => b.k === k);
+      if (all && inPlan && !r.planDone) { r.planDone = true; FR.addPts(50); FR.save(); setTimeout(() => FR.celebrate(3, 'Today\'s plan complete', plan.length + ' topics finished. +50 points'), 400); }
+      else setTimeout(() => FR.celebrate(2, 'Topic finished', esc(FR.BLOCKS.find((b) => b.k === k).t) + ' · +15 points'), 200);
     }
   };
   const lr = FR.lessonResult;

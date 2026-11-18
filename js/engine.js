@@ -194,7 +194,7 @@
     if (opt.cram) q = shuffle(d.cards);
     else { const due = d.cards.filter((c) => S.srs[c.id] && S.srs[c.id].due <= Date.now()).sort((a, b) => S.srs[a.id].due - S.srs[b.id].due); const nw = d.cards.filter((c) => !S.srs[c.id]).slice(0, opt.newMax || 15); q = due.concat(nw); }
     if (!q.length) { el.innerHTML = `<div class="empty"><p>Nothing due in <b>${esc(d.name)}</b> right now.</p><a class="btn" href="#/cards/${d.id}?cram=1">Cram the whole deck anyway</a> <a class="btn ghost" href="#/cards">All decks</a></div>`; return; }
-    let i = 0, flipped = false, done = 0, again = 0;
+    let i = 0, flipped = false, done = 0, again = 0; const uniq = new Set();
     const startN = q.length;
     const keyH = (e) => { if (!el.querySelector('.fc')) return; if (e.key === ' ') { e.preventDefault(); flip(); } else if (flipped && /^[1-4]$/.test(e.key)) rate(+e.key - 1); };
     addEventListener('keydown', keyH); FR.cleanups.push(() => removeEventListener('keydown', keyH));
@@ -222,14 +222,14 @@
       }
     }
     function rate(g) {
-      const c = q[i]; FR.rate(c, g); done++;
+      const c = q[i]; FR.rate(c, g); done++; uniq.add(c.id);
       if (g === 0) { q.splice(Math.min(q.length, i + 4), 0, c); again++; }
       i++; FR.save();
       if (i >= q.length) end(); else render();
     }
     function end() {
       FR.save(true);
-      if (done >= 10) FR.markBlock('vocab');
+      if (opt.onDone) opt.onDone({ done, unique: uniq.size, total: startN });
       if (done >= 5 && FR.celebrate) FR.celebrate(done >= 20 ? 2 : 1, 'Cards reviewed', done + ' reviews');
       const st = FR.deckStats(d);
       el.innerHTML = `<div class="ex-wrap"><div class="card" style="text-align:center;padding:28px"><div class="eyebrow">${esc(d.name)}</div><div class="sum-big">${done}</div><div class="dim">reviews · ${again} relearned</div><p>Learned (box 3+): <b>${st.learned}</b> / ${st.total}</p></div>

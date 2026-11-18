@@ -3,7 +3,7 @@
   'use strict';
   const FR = (window.FR = {});
   const LESSONS = window.LESSONS.sort((a, b) => a.day - b.day);
-  const STORIES = window.STORIES, DECKS = window.DECKS, WRITING = window.WRITING, VERBS = window.VERBS, CONJ = window.CONJ;
+  const STORIES = window.STORIES.concat(window.FICTION || []), DECKS = window.DECKS, WRITING = window.WRITING, VERBS = window.VERBS, CONJ = window.CONJ;
   Object.assign(FR, { LESSONS, STORIES, DECKS, WRITING, VERBS, CONJ });
 
   /* ---------- utils ---------- */
@@ -49,7 +49,7 @@
 
   /* ---------- state ---------- */
   const SAVE_KEY = 'fr-prep-v1';
-  const fresh = () => ({ v: 1, idv: 2, pts: 0, savedAt: 0, start: '2026-11-11', rate: 0.9, voice: '', font: 16, welcomed: false, ex: {}, les: {}, srs: {}, days: {}, st: {}, wr: {}, mocks: {}, mist: [], log: {}, drill: { c: 0, n: 0 } });
+  const fresh = () => ({ v: 1, idv: 2, pts: 0, savedAt: 0, start: '2026-11-11', rate: 0.9, voice: '', font: 16, welcomed: false, ex: {}, les: {}, srs: {}, days: {}, st: {}, wr: {}, mocks: {}, mist: [], log: {}, drill: { c: 0, n: 0 }, target: 60, topics: {}, words: {}, chat: {}, expr: {} });
   function load() { try { const o = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); return o && o.v ? o : null; } catch (e) { return null; } }
   let S = load() || fresh(); // raw save; normalized by FR.adopt once content ids are known (below)
   FR.S = () => S;
@@ -70,15 +70,41 @@
   FR.curDay = () => { const st = new Date(S.start + 'T00:00:00'); const d = Math.floor((new Date().setHours(0, 0, 0, 0) - st.getTime()) / DAY) + 1; return Math.max(1, Math.min(20, d)); };
   FR.rawDay = () => { const st = new Date(S.start + 'T00:00:00'); return Math.floor((new Date().setHours(0, 0, 0, 0) - st.getTime()) / DAY) + 1; };
   FR.dayRec = (n) => (S.days[n] = S.days[n] || { blocks: {}, sec: 0 });
+  // Flexible daily plan. Core topics come first; the plan fits your daily target, everything else is bonus.
   FR.BLOCKS = [
-    { k: 'grammar', t: 'Grammar + guided practice', m: 45 },
-    { k: 'vocab', t: 'Verbs & vocabulary', m: 30 },
-    { k: 'reading', t: 'Reading', m: 30 },
-    { k: 'listening', t: 'Listening & dictation', m: 30 },
-    { k: 'speaking', t: 'Speaking: shadowing', m: 30 },
-    { k: 'writing', t: 'Writing + active recall', m: 15 }
+    { k: 'grammar', t: 'Grammar lesson', m: 25, core: true },
+    { k: 'words', t: "Today's 50 words", m: 15, core: true },
+    { k: 'revise', t: "Revise yesterday's 50 words", m: 10, core: true },
+    { k: 'speaking', t: 'Speaking topic', m: 10, core: true },
+    { k: 'story', t: 'Story: read or listen', m: 15 },
+    { k: 'chat', t: 'Roleplay with your AI partner', m: 15 },
+    { k: 'expr', t: 'Native expressions', m: 5 },
+    { k: 'writing', t: 'Writing task', m: 15 }
   ];
-  FR.markBlock = (k) => { const r = FR.dayRec(FR.curDay()); if (!r.blocks[k]) { r.blocks[k] = true; FR.save(); FR.toast('Block done: <b>' + FR.BLOCKS.find((b) => b.k === k).t + '</b>', 'ok'); } };
+  const ALIAS = { vocab: 'words', reading: 'story', listening: 'story' };
+  FR.blockKey = (k) => ALIAS[k] || k;
+  FR.TARGETS = [30, 45, 60, 90, 120];
+  // blocks that fit today's target (revise only exists from day 2)
+  // Core topics are always planned (shortened on light days); extras are added only when the target leaves room.
+  FR.planned = (day) => {
+    const tgt = S.target || 60, ok = (b) => !(b.k === 'revise' && (day || FR.curDay()) < 2);
+    const core = FR.BLOCKS.filter((b) => b.core && ok(b)), coreMin = core.reduce((a, b) => a + b.m, 0);
+    const f = Math.min(1, tgt / coreMin);
+    const plan = core.map((b) => Object.assign({}, b, { m: Math.max(5, Math.round((b.m * f) / 5) * 5) }));
+    let left = tgt - plan.reduce((a, b) => a + b.m, 0);
+    FR.BLOCKS.filter((b) => !b.core && ok(b)).forEach((b) => { if (b.m <= left + 2) { plan.push(b); left -= b.m; } });
+    return plan;
+  };
+  FR.doneKeys = (rec) => Array.from(new Set(Object.keys((rec && rec.blocks) || {}).filter((k) => rec.blocks[k]).map(FR.blockKey)));
+  FR.topicsOn = (dateKey) => (S.topics[dateKey] || []).length;
+  FR.markBlock = (k) => {
+    k = FR.blockKey(k);
+    const b = FR.BLOCKS.find((x) => x.k === k); if (!b) return;
+    const tk = todayKey(); S.topics[tk] = S.topics[tk] || [];
+    if (!S.topics[tk].includes(k)) S.topics[tk].push(k);
+    const r = FR.dayRec(FR.curDay());
+    if (!r.blocks[k]) { r.blocks[k] = true; FR.save(); FR.toast('Topic finished: <b>' + b.t + '</b>', 'ok'); } else FR.save();
+  };
 
   /* ---------- active-time tracking (counts only when visible and you interacted in the last 2 minutes) ---------- */
   let lastAct = Date.now();
@@ -89,7 +115,9 @@
     if ((S.log[k] % 60) === 0) saveLocal();
     if ((S.log[k] % 300) === 0) FR.cloud.push(false);
   }, 15000);
-  FR.streak = () => { let n = 0; const d = new Date(); if ((S.log[todayKey(d)] || 0) < 1800) d.setDate(d.getDate() - 1); while ((S.log[todayKey(d)] || 0) >= 1800) { n++; d.setDate(d.getDate() - 1); } return n; };
+  const studied = (d) => (S.log[todayKey(d)] || 0) >= 900 || (S.topics[todayKey(d)] || []).length > 0;
+  FR.streak = () => { let n = 0; const d = new Date(); if (!studied(d)) d.setDate(d.getDate() - 1); while (studied(d)) { n++; d.setDate(d.getDate() - 1); } return n; };
+  FR.exprOfDay = () => { const all = (FR.EXPR || []).flatMap((c) => c.items); if (!all.length) return null; const n = Math.floor(new Date().setHours(0, 0, 0, 0) / DAY); return all[n % all.length]; };
   FR.totalSec = () => Object.values(S.log).reduce((a, b) => a + b, 0);
 
   /* ---------- exercises ---------- */
@@ -182,9 +210,12 @@
   FR.SPEAK = (window.SPEAK || []).sort((a, b) => a.day - b.day).map((t) => Object.assign({}, t, { V: lines(t.v), X: lines(t.x), P: lines(t.p), E: lines(t.e), Q: lines(t.q), O: lines(t.o) }));
   FR.speak = (d) => FR.SPEAK.find((t) => t.day === +d);
   FR.SPEAK_DECKS = {};
-  FR.SPEAK.forEach((t) => { FR.SPEAK_DECKS['sp' + t.day] = { id: 'sp' + t.day, name: 'Speaking ' + t.day + ': ' + t.title, day: t.day, speak: true, cards: t.V.concat(t.X).map((r, i) => ({ id: 'sp' + t.day + '-' + fh(r[0]), old: 'sp' + t.day + '-' + i, fr: r[0], en: r[1] || '' })) }; });
-  FR.deck = (id) => (id === 'verbs' ? FR.VERB_DECK : DECKS[id] || FR.SPEAK_DECKS[id]);
-  FR.allDecks = () => Object.values(DECKS).concat(Object.values(FR.SPEAK_DECKS), [FR.VERB_DECK]);
+  FR.SPEAK.forEach((t) => { FR.SPEAK_DECKS['sp' + t.day] = { id: 'sp' + t.day, name: 'Speaking ' + t.day + ': ' + t.title, day: t.day, speak: true, cards: (() => { const extra = lines((window.WORDS_EXTRA || {})[t.day]); const seen = new Set(); return t.V.concat(t.X).map((r, i) => ({ r, old: 'sp' + t.day + '-' + i })).concat(extra.map((r) => ({ r }))).filter((x) => { const k = x.r[0].toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 50).map((x) => ({ id: 'sp' + t.day + '-' + fh(x.r[0]), old: x.old, fr: x.r[0], en: x.r[1] || '' })); })() }; });
+  /* ---------- native expressions ---------- */
+  FR.EXPR = (window.EXPRESSIONS || []).map((c) => ({ id: c.id, title: c.title, items: String(c.lines).trim().split('\n').map((l) => { const [fr, en, ex, reg] = l.split('|').map((x) => (x || '').trim()); return { id: 'x-' + fh(fr), fr, en, ex, reg }; }) }));
+  FR.EXPR_DECKS = {}; FR.EXPR.forEach((c) => { FR.EXPR_DECKS['ex-' + c.id] = { id: 'ex-' + c.id, name: 'Expressions: ' + c.title, day: 0, expr: true, cards: c.items.map((it) => ({ id: it.id, fr: it.fr, en: it.en })) }; });
+  FR.deck = (id) => (id === 'verbs' ? FR.VERB_DECK : DECKS[id] || FR.SPEAK_DECKS[id] || FR.EXPR_DECKS[id]);
+  FR.allDecks = () => Object.values(DECKS).concat(Object.values(FR.SPEAK_DECKS), Object.values(FR.EXPR_DECKS), [FR.VERB_DECK]);
   FR.cardDue = (c) => { const r = S.srs[c.id]; return !r || r.due <= Date.now(); };
   FR.deckStats = (d) => { let n = 0, due = 0, learned = 0; d.cards.forEach((c) => { const r = S.srs[c.id]; if (!r) n++; else { if (r.due <= Date.now()) due++; if (r.b >= 3) learned++; } }); return { new: n, due, learned, total: d.cards.length }; };
   FR.rate = (c, g) => { // g: 0 again, 1 hard, 2 good, 3 easy
@@ -297,6 +328,10 @@
     o.sp = {}; keys(A.sp, B.sp).forEach((k) => { o.sp[k] = { q: Math.max(((A.sp || {})[k] || {}).q || 0, ((B.sp || {})[k] || {}).q || 0) }; });
     o.drill = { c: Math.max((A.drill || {}).c || 0, (B.drill || {}).c || 0), n: Math.max((A.drill || {}).n || 0, (B.drill || {}).n || 0) };
     o.pts = Math.max(A.pts || 0, B.pts || 0);
+    o.topics = {}; keys(A.topics, B.topics).forEach((k) => { o.topics[k] = Array.from(new Set(((A.topics || {})[k] || []).concat((B.topics || {})[k] || []))); });
+    o.words = {}; keys(A.words, B.words).forEach((k) => { o.words[k] = Object.assign({}, (A.words || {})[k], (B.words || {})[k]); });
+    o.expr = {}; keys(A.expr, B.expr).forEach((k) => { o.expr[k] = Math.max((A.expr || {})[k] || 0, (B.expr || {})[k] || 0); });
+    o.chat = {}; keys(A.chat, B.chat).forEach((k) => { const a = (A.chat || {})[k], b = (B.chat || {})[k]; o.chat[k] = !a || !b ? (a || b) : ((b.at || 0) > (a.at || 0) ? b : a); o.chat[k] = Object.assign({}, o.chat[k], { turns: Math.max((a && a.turns) || 0, (b && b.turns) || 0) }); });
     o.mist = newer.mist || [];
     o.welcomed = true; o.idv = 2; o.savedAt = Date.now();
     return o;
